@@ -32,6 +32,27 @@ app.Run();
 - `GET /dim/health`
 - SignalR Hub：`/dim/hub`
 
+### SignalR 接入鉴权
+
+业务项目需要实现并注册 `IDimChatAuthenticator`，鉴权成功后返回 `uid` 和客户端平台：
+
+```csharp
+public sealed class AppDimChatAuthenticator : IDimChatAuthenticator
+{
+    public ValueTask<DimChatAuthenticationResult?> AuthenticateAsync(
+        DimChatAuthenticationContext context,
+        CancellationToken cancellationToken)
+    {
+        return ValueTask.FromResult<DimChatAuthenticationResult?>(
+            new DimChatAuthenticationResult("user-id", DimClientPlatform.Web));
+    }
+}
+```
+
+平台固定为 `ios`、`android`、`web`。默认允许多设备登录，同一用户每个平台只保留一个连接；关闭多设备登录后，同一用户只保留一个连接。
+
+Redis 路由使用 `DimChat:Storage:RedisConnectionString` 配置，并通过 `Ku.Utils.Database.Redis.RedisConnectionFactory` 复用连接。未配置 Redis 时应用仍可启动，但 SignalR 连接会被拒绝。
+
 ## 本地开发
 
 ```bash
@@ -40,5 +61,3 @@ dotnet build
 dotnet test
 dotnet run --project src/Dim.SampleHost
 ```
-
-第一阶段只初始化框架骨架，不实现消息收发、会话、在线状态和鉴权等业务功能。

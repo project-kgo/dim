@@ -12,6 +12,9 @@ public sealed class DimChatOptionsTests
 
         options.EndpointPrefix.Should().Be("/dim");
         options.HubPath.Should().Be("/hub");
+        options.Connection.AllowMultiDeviceLogin.Should().BeTrue();
+        options.Connection.RouteKeyPrefix.Should().Be("dim:routes");
+        options.Connection.RouteTtl.Should().Be(TimeSpan.FromDays(7));
         options.Storage.RedisStreamName.Should().Be("dim:messages");
     }
 }

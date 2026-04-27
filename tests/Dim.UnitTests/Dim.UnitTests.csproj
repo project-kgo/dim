@@ -19,7 +19,9 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Dim.Abstractions\Dim.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\Dim.Application\Dim.Application.csproj" />
+    <ProjectReference Include="..\..\src\Dim.AspNetCore\Dim.AspNetCore.csproj" />
     <ProjectReference Include="..\..\src\Dim.Domain\Dim.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Dim.Infrastructure\Dim.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

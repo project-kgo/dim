@@ -1,5 +1,7 @@
 using Dim.Abstractions.Configuration;
 using Dim.Abstractions.Runtime;
+using Dim.Application.Routing;
+using Dim.AspNetCore.Authentication;
 using Dim.Application.Runtime;
 using Dim.AspNetCore.Hubs;
 using Dim.AspNetCore.Routing;
@@ -29,6 +31,8 @@ public static class DimChatAspNetCoreExtensions
             .ValidateDataAnnotations();
 
         services.TryAddSingleton<IDimChatRuntime, DimChatRuntime>();
+        services.TryAddSingleton<IDimAuthenticator, DefaultDimChatAuthenticator>();
+        services.TryAddSingleton<DimChatRouteService>();
         services.AddDimInfrastructure(configuration);
         services.AddSignalR();
 

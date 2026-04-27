@@ -12,5 +12,7 @@ public sealed class DimChatOptions
     [Required]
     public string HubPath { get; set; } = "/hub";
 
+    public DimChatConnectionOptions Connection { get; set; } = new();
+
     public DimChatStorageOptions Storage { get; set; } = new();
 }
