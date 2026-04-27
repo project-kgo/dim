@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Dim.Abstractions\Dim.Abstractions.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <PackageId>Dim.Domain</PackageId>
+    <Description>Dim IM Chat 框架的领域模型。</Description>
+  </PropertyGroup>
+
+</Project>

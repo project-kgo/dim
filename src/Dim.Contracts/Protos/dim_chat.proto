@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+option csharp_namespace = "Dim.Contracts";
+
+package dim.chat.v1;
+
+message ChatEnvelope {
+  string message_id = 1;
+  string conversation_id = 2;
+  string sender_id = 3;
+  string content = 4;
+  int64 sent_at_unix_time_milliseconds = 5;
+}

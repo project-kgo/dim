@@ -1,0 +1,31 @@
+.vscode
+.trae
+.codex
+
+# Build results
+bin/
+obj/
+artifacts/
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+# User-specific files
+*.user
+*.suo
+*.rsuser
+*.userosscache
+*.sln.docstates
+
+# Rider / JetBrains
+.idea/
+
+# Visual Studio / VS Code local state
+.vs/
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+project.lock.json

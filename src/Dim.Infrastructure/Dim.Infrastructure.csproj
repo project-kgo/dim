@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Dim.Abstractions\Dim.Abstractions.csproj" />
+    <ProjectReference Include="..\Dim.Application\Dim.Application.csproj" />
+    <ProjectReference Include="..\Dim.Domain\Dim.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="StackExchange.Redis" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <PackageId>Dim.Infrastructure</PackageId>
+    <Description>Dim IM Chat 框架的基础设施实现。</Description>
+  </PropertyGroup>
+
+</Project>

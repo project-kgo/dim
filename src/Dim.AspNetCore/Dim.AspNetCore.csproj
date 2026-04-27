@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Dim.Abstractions\Dim.Abstractions.csproj" />
+    <ProjectReference Include="..\Dim.Application\Dim.Application.csproj" />
+    <ProjectReference Include="..\Dim.Infrastructure\Dim.Infrastructure.csproj" />
+    <ProjectReference Include="..\Dim.Contracts\Dim.Contracts.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <PackageId>Dim.AspNetCore</PackageId>
+    <Description>Dim IM Chat 框架的 ASP.NET Core 宿主集成。</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+</Project>

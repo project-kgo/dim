@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Dim.Abstractions</PackageId>
+    <Description>Dim IM Chat 框架的对外稳定抽象。</Description>
+  </PropertyGroup>
+
+</Project>
