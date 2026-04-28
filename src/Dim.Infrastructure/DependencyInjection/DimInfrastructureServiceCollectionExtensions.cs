@@ -24,10 +24,7 @@ public static class DimInfrastructureServiceCollectionExtensions
         var postgreSqlConnectionString = configuration["DimChat:Storage:PostgreSqlConnectionString"];
         if (!string.IsNullOrWhiteSpace(postgreSqlConnectionString))
         {
-            services.AddDbContext<DimDbContext>(options =>
-            {
-                options.UseNpgsql(postgreSqlConnectionString);
-            });
+            services.AddDbContext<DimDbContext>(options => options.UseNpgsql(postgreSqlConnectionString));
         }
 
         var redisConnectionString = configuration["DimChat:Storage:RedisConnectionString"];
