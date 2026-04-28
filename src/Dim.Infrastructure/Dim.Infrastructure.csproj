@@ -4,7 +4,7 @@
     <ProjectReference Include="..\Dim.Abstractions\Dim.Abstractions.csproj" />
     <ProjectReference Include="..\Dim.Application\Dim.Application.csproj" />
     <ProjectReference Include="..\Dim.Domain\Dim.Domain.csproj" />
-    <ProjectReference Include="/Users/kanonlee/codes/ku-dotnet/src/Ku.Utils/Ku.Utils.csproj" />
+    <ProjectReference Include="../../../ku-dotnet/src/Ku.Utils/Ku.Utils.csproj" />
   </ItemGroup>
 
   <ItemGroup>
