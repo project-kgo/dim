@@ -27,6 +27,8 @@ description: 项目规范 (Project Rules)
 - **数据库**: Entity Framework Core (PostgreSQL)
 - **缓存**: Redis (StackExchange.Redis)
 - **消息队列**: Redis Stream
+- **消息序列化**: protobuf
+- **api**: api的请求和响应都通过protobuf定义
 
 ## 编码规范
 

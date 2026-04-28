@@ -8,6 +8,7 @@ using Dim.AspNetCore.Routing;
 using Dim.Infrastructure.DependencyInjection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -61,7 +62,9 @@ public static class DimChatAspNetCoreExtensions
                 status.State));
         });
 
-        endpoints.MapHub<DimChatHub>($"{endpointPrefix}/{hubPath}");
+        endpoints.MapHub<DimChatHub>(
+            $"{endpointPrefix}/{hubPath}",
+            options => options.Transports = HttpTransportType.WebSockets);
 
         return endpoints;
     }
