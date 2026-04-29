@@ -5,7 +5,6 @@ using Dim.Infrastructure.Redis;
 using Ku.Utils.Database.Redis;
 using Ku.Utils.Database.PostgreSql;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
@@ -16,62 +15,92 @@ namespace Dim.Infrastructure.DependencyInjection;
 
 public static class DimInfrastructureServiceCollectionExtensions
 {
-    public static IServiceCollection AddDimInfrastructure(
-        this IServiceCollection services,
-        IOptions<DimChatOptions> dimChatOptions)
+    public static IServiceCollection AddDimInfrastructure(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        ArgumentNullException.ThrowIfNull(dimChatOptions);
 
-        var storageOptions = dimChatOptions.Value.Storage;
-        ArgumentNullException.ThrowIfNull(storageOptions);
-
-        var masterDataSource = PostgreSqlDataSourceFactory.GetOrCreate(new PostgreSqlConnectionOptions
+        services.TryAddSingleton(serviceProvider =>
         {
-            ConnectionString = storageOptions.PgMasterSqlConnectionString!
-        });
+            var options = serviceProvider
+                .GetRequiredService<IOptions<DimChatOptions>>()
+                .Value;
 
-        var pgSlaveSqlConnectionString = storageOptions.PgSlaveSqlConnectionString;
-        pgSlaveSqlConnectionString ??= storageOptions.PgMasterSqlConnectionString;
+            var masterConnectionString = GetRequiredConnectionString(
+                options.Storage.PgMasterSqlConnectionString,
+                "DimChat:Storage:PgMasterSqlConnectionString");
 
-        var slaveDataSource = PostgreSqlDataSourceFactory.GetOrCreate(new PostgreSqlConnectionOptions
-        {
-            ConnectionString = pgSlaveSqlConnectionString!
-        });
-
-        services.TryAddSingleton(new DimMasterDataSource(masterDataSource));
-        services.TryAddSingleton(new DimSlaveDataSource(slaveDataSource));
-
-
-        services.AddDbContext<DimDbContext>((sp, options) => {
-            var ds = sp.GetRequiredService<DimMasterDataSource>().Value;
-            options.UseNpgsql(ds);
-        });
-
-        services.AddDbContext<DimSlaveDbContext>((sp, options) => {
-            var ds = sp.GetRequiredService<DimSlaveDataSource>().Value;
-            options.UseNpgsql(ds);
-        });
-
-        if (!string.IsNullOrWhiteSpace(storageOptions.RedisConnectionString))
-        {
-            services.TryAddSingleton<IConnectionMultiplexer>(serviceProvider =>
+            var dataSource = PostgreSqlDataSourceFactory.GetOrCreate(new PostgreSqlConnectionOptions
             {
-                var options = serviceProvider
-                    .GetRequiredService<IOptions<DimChatOptions>>()
-                    .Value;
-
-                return RedisConnectionFactory.GetOrCreate(new RedisConnectionOptions
-                {
-                    ConnectionString = options.Storage.RedisConnectionString!
-                });
+                ConnectionString = masterConnectionString
             });
-            services.TryAddSingleton<IDimChatRouteStore, RedisDimChatRouteStore>();
-        }
-        else
+
+            return new DimMasterDataSource(dataSource);
+        });
+
+        services.TryAddSingleton(serviceProvider =>
         {
-            services.TryAddSingleton<IDimChatRouteStore, MissingRedisDimChatRouteStore>();
-        }
+            var options = serviceProvider
+                .GetRequiredService<IOptions<DimChatOptions>>()
+                .Value;
+
+            var masterConnectionString = GetRequiredConnectionString(
+                options.Storage.PgMasterSqlConnectionString,
+                "DimChat:Storage:PgMasterSqlConnectionString");
+
+            var slaveConnectionString = string.IsNullOrWhiteSpace(options.Storage.PgSlaveSqlConnectionString)
+                ? masterConnectionString
+                : options.Storage.PgSlaveSqlConnectionString;
+
+            var dataSource = PostgreSqlDataSourceFactory.GetOrCreate(new PostgreSqlConnectionOptions
+            {
+                ConnectionString = slaveConnectionString
+            });
+
+            return new DimSlaveDataSource(dataSource);
+        });
+
+        services.AddDbContext<DimDbContext>((sp, options) =>
+        {
+            var dataSource = sp.GetRequiredService<DimMasterDataSource>().Value;
+            options.UseNpgsql(dataSource);
+        });
+
+        services.AddDbContext<DimSlaveDbContext>((sp, options) =>
+        {
+            var dataSource = sp.GetRequiredService<DimSlaveDataSource>().Value;
+            options.UseNpgsql(dataSource);
+        });
+
+        services.TryAddSingleton<IConnectionMultiplexer>(serviceProvider =>
+        {
+            var options = serviceProvider
+                .GetRequiredService<IOptions<DimChatOptions>>()
+                .Value;
+
+            var redisConnectionString = GetRequiredConnectionString(
+                options.Storage.RedisConnectionString,
+                "DimChat:Storage:RedisConnectionString");
+
+            return RedisConnectionFactory.GetOrCreate(new RedisConnectionOptions
+            {
+                ConnectionString = redisConnectionString
+            });
+        });
+
+        services.TryAddSingleton<IDimChatRouteStore>(serviceProvider =>
+        {
+            var options = serviceProvider
+                .GetRequiredService<IOptions<DimChatOptions>>();
+
+            if (string.IsNullOrWhiteSpace(options.Value.Storage.RedisConnectionString))
+            {
+                return new MissingRedisDimChatRouteStore();
+            }
+
+            return new RedisDimChatRouteStore(
+                serviceProvider.GetRequiredService<IConnectionMultiplexer>(),
+                options);
+        });
 
         services.TryAddSingleton(serviceProvider =>
         {
@@ -86,5 +115,26 @@ public static class DimInfrastructureServiceCollectionExtensions
         });
 
         return services;
+    }
+
+    public static IServiceCollection AddDimInfrastructure(
+        this IServiceCollection services,
+        IOptions<DimChatOptions> dimChatOptions)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(dimChatOptions);
+
+        services.TryAddSingleton(dimChatOptions);
+        return services.AddDimInfrastructure();
+    }
+
+    private static string GetRequiredConnectionString(string? connectionString, string configurationKey)
+    {
+        if (!string.IsNullOrWhiteSpace(connectionString))
+        {
+            return connectionString;
+        }
+
+        throw new InvalidOperationException($"{configurationKey} 未配置。");
     }
 }

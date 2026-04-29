@@ -34,7 +34,7 @@ public static class DimChatAspNetCoreExtensions
         services.TryAddSingleton<IDimChatRuntime, DimChatRuntime>();
         services.TryAddSingleton<IDimAuthenticator, DefaultDimChatAuthenticator>();
         services.TryAddSingleton<DimChatRouteService>();
-        services.AddDimInfrastructure(configuration);
+        services.AddDimInfrastructure();
         services.AddSignalR();
 
         return services;
