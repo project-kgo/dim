@@ -2,7 +2,9 @@ namespace Dim.Abstractions.Configuration;
 
 public sealed class DimChatStorageOptions
 {
-    public string? PostgreSqlConnectionString { get; set; }
+    public string? PgMasterSqlConnectionString { get; set; }
+
+    public string? PgSlaveSqlConnectionString { get; set; }
 
     public string? RedisConnectionString { get; set; }
 

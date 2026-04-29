@@ -3,11 +3,13 @@ using Dim.Abstractions.Routing;
 using Dim.Infrastructure.Persistence;
 using Dim.Infrastructure.Redis;
 using Ku.Utils.Database.Redis;
+using Ku.Utils.Database.PostgreSql;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using Npgsql;
 using StackExchange.Redis;
 
 namespace Dim.Infrastructure.DependencyInjection;
@@ -16,19 +18,42 @@ public static class DimInfrastructureServiceCollectionExtensions
 {
     public static IServiceCollection AddDimInfrastructure(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IOptions<DimChatOptions> dimChatOptions)
     {
         ArgumentNullException.ThrowIfNull(services);
-        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(dimChatOptions);
 
-        var postgreSqlConnectionString = configuration["DimChat:Storage:PostgreSqlConnectionString"];
-        if (!string.IsNullOrWhiteSpace(postgreSqlConnectionString))
+        var storageOptions = dimChatOptions.Value.Storage;
+        ArgumentNullException.ThrowIfNull(storageOptions);
+
+        var masterDataSource = PostgreSqlDataSourceFactory.GetOrCreate(new PostgreSqlConnectionOptions
         {
-            services.AddDbContext<DimDbContext>(options => options.UseNpgsql(postgreSqlConnectionString));
-        }
+            ConnectionString = storageOptions.PgMasterSqlConnectionString!
+        });
 
-        var redisConnectionString = configuration["DimChat:Storage:RedisConnectionString"];
-        if (!string.IsNullOrWhiteSpace(redisConnectionString))
+        var pgSlaveSqlConnectionString = storageOptions.PgSlaveSqlConnectionString;
+        pgSlaveSqlConnectionString ??= storageOptions.PgMasterSqlConnectionString;
+
+        var slaveDataSource = PostgreSqlDataSourceFactory.GetOrCreate(new PostgreSqlConnectionOptions
+        {
+            ConnectionString = pgSlaveSqlConnectionString!
+        });
+
+        services.TryAddSingleton(new DimMasterDataSource(masterDataSource));
+        services.TryAddSingleton(new DimSlaveDataSource(slaveDataSource));
+
+
+        services.AddDbContext<DimDbContext>((sp, options) => {
+            var ds = sp.GetRequiredService<DimMasterDataSource>().Value;
+            options.UseNpgsql(ds);
+        });
+
+        services.AddDbContext<DimSlaveDbContext>((sp, options) => {
+            var ds = sp.GetRequiredService<DimSlaveDataSource>().Value;
+            options.UseNpgsql(ds);
+        });
+
+        if (!string.IsNullOrWhiteSpace(storageOptions.RedisConnectionString))
         {
             services.TryAddSingleton<IConnectionMultiplexer>(serviceProvider =>
             {
