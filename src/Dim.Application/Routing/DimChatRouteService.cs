@@ -18,57 +18,31 @@ public sealed class DimChatRouteService(IDimChatRouteStore routeStore)
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionId);
         ArgumentNullException.ThrowIfNull(options);
 
-        var scope = CreateScope(userId, platform, options);
-        var previousRoute = await _routeStore.GetRouteAsync(scope, cancellationToken);
         var currentRoute = new DimChatRoute(
-            scope,
             userId,
             platform,
             connectionId,
             DateTimeOffset.UtcNow);
 
-        await _routeStore.SetRouteAsync(currentRoute, options.RouteTtl, cancellationToken);
+        var previousConnectionIds = await _routeStore.SetRouteAsync(currentRoute, options.RouteTtl, cancellationToken);
 
-        var replacedRoute = previousRoute?.ConnectionId == connectionId ? null : previousRoute;
-        return new DimChatRouteConnectResult(currentRoute, replacedRoute);
+        return new DimChatRouteConnectResult(currentRoute, previousConnectionIds);
     }
 
-    public async ValueTask DisconnectAsync(string connectionId, CancellationToken cancellationToken)
+    public async ValueTask DisconnectAsync(DimChatRoute route, CancellationToken cancellationToken)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(connectionId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(route.ConnectionId);
 
-        var scope = await _routeStore.GetRouteScopeAsync(connectionId, cancellationToken);
-        if (scope is null)
-        {
-            return;
-        }
-
-        await _routeStore.RemoveRouteIfCurrentAsync(scope, connectionId, cancellationToken);
+        await _routeStore.RemoveRouteAsync(route, cancellationToken);
     }
 
     public async ValueTask<bool> RefreshRouteAsync(
-        string connectionId,
+        DimChatRoute route,
         TimeSpan ttl,
         CancellationToken cancellationToken)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(connectionId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(route.ConnectionId);
 
-        var scope = await _routeStore.GetRouteScopeAsync(connectionId, cancellationToken);
-        if (scope is null)
-        {
-            return false;
-        }
-
-        return await _routeStore.RefreshRouteAsync(scope, connectionId, ttl, cancellationToken);
-    }
-
-    private static DimChatRouteScope CreateScope(
-        string userId,
-        DimClientPlatform platform,
-        DimChatConnectionOptions options)
-    {
-        return options.AllowMultiDeviceLogin
-            ? DimChatRouteScope.ForPlatform(userId, platform)
-            : DimChatRouteScope.ForUser(userId);
+        return await _routeStore.RefreshRouteAsync(route, ttl, cancellationToken);
     }
 }

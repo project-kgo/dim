@@ -1,9 +1,10 @@
 using System.Security.Claims;
+using Dim.Abstractions.Authentication;
 using Dim.Abstractions.Configuration;
 using Dim.Abstractions.Routing;
 using Dim.Application.Routing;
-using Dim.AspNetCore.Authentication;
 using Dim.AspNetCore.Hubs;
+using Dim.UnitTests.Routing;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.SignalR;
@@ -14,11 +15,11 @@ namespace Dim.UnitTests.Hubs;
 public sealed class DimChatHubTests
 {
     [Fact]
-    public async Task OnConnectedAsyncWhenAuthenticatorRejectsShouldAbortConnection()
+    public async Task OnConnectedAsyncWhenUserClaimsInvalidShouldAbortConnection()
     {
-        var store = new InMemoryRouteStore();
+        var store = new TestDimChatRouteStore();
         var context = new TestHubCallerContext("c1");
-        var hub = CreateHub(new TestAuthenticator(null), store, context, new RecordingHubClients());
+        var hub = CreateHub(store, context, new RecordingHubClients());
 
         await hub.OnConnectedAsync();
 
@@ -29,14 +30,13 @@ public sealed class DimChatHubTests
     [Fact]
     public async Task OnConnectedAsyncWhenRouteIsReplacedShouldNotifyOldConnection()
     {
-        var store = new InMemoryRouteStore();
+        var store = new TestDimChatRouteStore();
         var service = new DimChatRouteService(store);
         await service.ConnectAsync("u1", DimClientPlatform.Web, "old", new DimChatConnectionOptions(), CancellationToken.None);
         var clients = new RecordingHubClients();
         var hub = CreateHub(
-            new TestAuthenticator(new DimChatAuthenticationResult("u1", DimClientPlatform.Web)),
             store,
-            new TestHubCallerContext("new"),
+            new TestHubCallerContext("new", CreateUser("u1", DimClientPlatform.Web)),
             clients);
 
         await hub.OnConnectedAsync();
@@ -48,13 +48,11 @@ public sealed class DimChatHubTests
     }
 
     private static DimChatHub CreateHub(
-        IDimAuthenticator authenticator,
-        InMemoryRouteStore store,
+        TestDimChatRouteStore store,
         HubCallerContext context,
         IHubCallerClients clients)
     {
         return new DimChatHub(
-            authenticator,
             new DimChatRouteService(store),
             Options.Create(new DimChatOptions()))
         {
@@ -63,28 +61,29 @@ public sealed class DimChatHubTests
         };
     }
 
-    private sealed class TestAuthenticator : IDimAuthenticator
+    private static ClaimsPrincipal CreateUser(
+        string userId,
+        DimClientPlatform platform)
     {
-        private readonly DimChatAuthenticationResult? _result;
-
-        public TestAuthenticator(DimChatAuthenticationResult? result)
+        var claims = new[]
         {
-            _result = result;
-        }
+            new Claim(AuthConstants.UserIdClaim, userId),
+            new Claim(AuthConstants.PlatformClaim, platform.ToString())
+        };
 
-        public ValueTask<DimChatAuthenticationResult?> AuthenticateAsync(
-            DimAuthenticationContext context,
-            CancellationToken cancellationToken)
-        {
-            return ValueTask.FromResult(_result);
-        }
+        return new ClaimsPrincipal(new ClaimsIdentity(claims, AuthConstants.Scheme));
     }
 
     private sealed class TestHubCallerContext : HubCallerContext
     {
-        public TestHubCallerContext(string connectionId)
+        private readonly ClaimsPrincipal? _user;
+
+        public TestHubCallerContext(
+            string connectionId,
+            ClaimsPrincipal? user = null)
         {
             ConnectionId = connectionId;
+            _user = user;
         }
 
         public bool Aborted { get; private set; }
@@ -93,7 +92,7 @@ public sealed class DimChatHubTests
 
         public override string? UserIdentifier => null;
 
-        public override ClaimsPrincipal? User => null;
+        public override ClaimsPrincipal? User => _user;
 
         public override IDictionary<object, object?> Items { get; } = new Dictionary<object, object?>();
 
@@ -188,49 +187,4 @@ public sealed class DimChatHubTests
         string ConnectionId,
         string Method,
         object?[] Arguments);
-
-    private sealed class InMemoryRouteStore : IDimChatRouteStore
-    {
-        private readonly Dictionary<string, DimChatRoute> _routes = new(StringComparer.Ordinal);
-        private readonly Dictionary<string, DimChatRouteScope> _connections = new(StringComparer.Ordinal);
-
-        public IReadOnlyDictionary<string, DimChatRoute> Routes => _routes;
-
-        public ValueTask<DimChatRoute?> GetRouteAsync(DimChatRouteScope scope, CancellationToken cancellationToken)
-        {
-            _routes.TryGetValue(scope.Key, out var route);
-            return ValueTask.FromResult(route);
-        }
-
-        public ValueTask SetRouteAsync(DimChatRoute route, TimeSpan ttl, CancellationToken cancellationToken)
-        {
-            _routes[route.Scope.Key] = route;
-            _connections[route.ConnectionId] = route.Scope;
-            return ValueTask.CompletedTask;
-        }
-
-        public ValueTask<DimChatRouteScope?> GetRouteScopeAsync(string connectionId, CancellationToken cancellationToken)
-        {
-            _connections.TryGetValue(connectionId, out var scope);
-            return ValueTask.FromResult(scope);
-        }
-
-        public ValueTask<bool> RemoveRouteIfCurrentAsync(DimChatRouteScope scope, string connectionId, CancellationToken cancellationToken)
-        {
-            if (!_routes.TryGetValue(scope.Key, out var route) || route.ConnectionId != connectionId)
-            {
-                return ValueTask.FromResult(false);
-            }
-
-            _routes.Remove(scope.Key);
-            _connections.Remove(connectionId);
-            return ValueTask.FromResult(true);
-        }
-
-        public ValueTask<bool> RefreshRouteAsync(DimChatRouteScope scope, string connectionId, TimeSpan ttl, CancellationToken cancellationToken)
-        {
-            return ValueTask.FromResult(
-                _routes.TryGetValue(scope.Key, out var route) && route.ConnectionId == connectionId);
-        }
-    }
 }

@@ -1,15 +1,19 @@
+using Dim.Abstractions.Authentication;
 using Dim.Abstractions.Configuration;
 using Dim.Abstractions.Runtime;
+using Dim.Application.Runtime;
 using Dim.Application.Routing;
 using Dim.AspNetCore.Authentication;
-using Dim.Application.Runtime;
 using Dim.AspNetCore.Hubs;
 using Dim.AspNetCore.Routing;
 using Dim.Infrastructure.DependencyInjection;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -32,10 +36,19 @@ public static class DimChatAspNetCoreExtensions
             .ValidateDataAnnotations();
 
         services.TryAddSingleton<IDimChatRuntime, DimChatRuntime>();
-        services.TryAddSingleton<IDimAuthenticator, DefaultDimChatAuthenticator>();
         services.TryAddSingleton<DimChatRouteService>();
         services.AddDimInfrastructure();
+        services.TryAddSingleton<IUserIdProvider, DimAuthenticationUserIdProvider>();
+        services.TryAddSingleton<IDimTokenValidator, DefaultDimTokenValidator>();
         services.AddSignalR();
+
+        services
+            .AddAuthentication(AuthConstants.Scheme)
+            .AddScheme<AuthenticationSchemeOptions, DimTokenAuthenticationHandler>(
+                AuthConstants.Scheme,
+                _ => { });
+
+        services.AddAuthorization();
 
         return services;
     }
@@ -62,9 +75,14 @@ public static class DimChatAspNetCoreExtensions
                 status.State));
         });
 
-        endpoints.MapHub<DimChatHub>(
-            $"{endpointPrefix}/{hubPath}",
-            options => options.Transports = HttpTransportType.WebSockets);
+        endpoints
+            .MapHub<DimChatHub>(
+                $"{endpointPrefix}/{hubPath}",
+                options => options.Transports = HttpTransportType.WebSockets)
+            .RequireAuthorization(new AuthorizeAttribute
+            {
+                AuthenticationSchemes = AuthConstants.Scheme
+            });
 
         return endpoints;
     }

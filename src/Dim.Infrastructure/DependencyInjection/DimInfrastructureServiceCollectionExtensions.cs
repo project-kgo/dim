@@ -1,7 +1,7 @@
 using Dim.Abstractions.Configuration;
 using Dim.Abstractions.Routing;
 using Dim.Infrastructure.Persistence;
-using Dim.Infrastructure.Redis;
+using Dim.Infrastructure.Routing;
 using Ku.Utils.Database.Redis;
 using Ku.Utils.Database.PostgreSql;
 using Microsoft.EntityFrameworkCore;
@@ -94,24 +94,12 @@ public static class DimInfrastructureServiceCollectionExtensions
 
             if (string.IsNullOrWhiteSpace(options.Value.Storage.RedisConnectionString))
             {
-                return new MissingRedisDimChatRouteStore();
+                return new MissingDimRouteStore();
             }
 
-            return new RedisDimChatRouteStore(
+            return new DimRouteStore(
                 serviceProvider.GetRequiredService<IConnectionMultiplexer>(),
                 options);
-        });
-
-        services.TryAddSingleton(serviceProvider =>
-        {
-            var options = serviceProvider
-                .GetRequiredService<IOptions<DimChatOptions>>()
-                .Value;
-
-            return new DimRedisStreamOptions
-            {
-                StreamName = options.Storage.RedisStreamName
-            };
         });
 
         return services;

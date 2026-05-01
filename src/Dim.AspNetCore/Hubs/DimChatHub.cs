@@ -1,54 +1,43 @@
+using Dim.Abstractions.Authentication;
 using Dim.Abstractions.Configuration;
 using Dim.Abstractions.Routing;
 using Dim.Application.Routing;
-using Dim.AspNetCore.Authentication;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Options;
 
 namespace Dim.AspNetCore.Hubs;
 
 public sealed class DimChatHub(
-    IDimAuthenticator authenticator,
     DimChatRouteService routeService,
     IOptions<DimChatOptions> options) : Hub
 {
     private const string ForceOfflineClientMethod = "ForceOffline";
     private const string ForceOfflineReason = "replaced";
 
-    private readonly IDimAuthenticator _authenticator = authenticator;
     private readonly DimChatRouteService _routeService = routeService;
     private readonly DimChatConnectionOptions _connectionOptions = options.Value.Connection;
 
     public override async Task OnConnectedAsync()
     {
-        var authenticationResult = await _authenticator.AuthenticateAsync(
-            new DimAuthenticationContext(
-                Context.GetHttpContext(),
-                Context.User,
-                Context.ConnectionId),
-            Context.ConnectionAborted);
-
-        if (!IsValid(authenticationResult))
+        if (!TryGetAuthenticatedUser(out var userId, out var platform))
         {
             Context.Abort();
             return;
         }
 
-        var authenticatedUser = authenticationResult!;
-
         try
         {
             var routeResult = await _routeService.ConnectAsync(
-                authenticatedUser.UserId,
-                authenticatedUser.Platform,
+                userId,
+                platform,
                 Context.ConnectionId,
                 _connectionOptions,
                 Context.ConnectionAborted);
 
-            if (routeResult.ReplacedRoute is { } replacedRoute)
+            if (routeResult.PreviousConnectionIds is { } previousConnectionIds)
             {
                 await Clients
-                    .Client(replacedRoute.ConnectionId)
+                    .Clients(previousConnectionIds)
                     .SendAsync(
                         ForceOfflineClientMethod,
                         ForceOfflineReason,
@@ -66,9 +55,15 @@ public sealed class DimChatHub(
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
+        if (!TryGetAuthenticatedUser(out var userId, out var platform))
+        {
+            Context.Abort();
+            return;
+        }
+        var route = new DimChatRoute(userId, platform, Context.ConnectionId, DateTimeOffset.UtcNow);
         try
         {
-            await _routeService.DisconnectAsync(Context.ConnectionId, CancellationToken.None);
+            await _routeService.DisconnectAsync(route, CancellationToken.None);
         }
         catch (InvalidOperationException)
         {
@@ -78,25 +73,17 @@ public sealed class DimChatHub(
         await base.OnDisconnectedAsync(exception);
     }
 
-    public async ValueTask<bool> RefreshRouteAsync()
+    private bool TryGetAuthenticatedUser(
+        out string userId,
+        out DimClientPlatform platform)
     {
-        try
-        {
-            return await _routeService.RefreshRouteAsync(
-                Context.ConnectionId,
-                _connectionOptions.RouteTtl,
-                Context.ConnectionAborted);
-        }
-        catch (InvalidOperationException)
-        {
-            return false;
-        }
-    }
+        userId = Context.User?.FindFirst(AuthConstants.UserIdClaim)?.Value ?? string.Empty;
+        platform = default;
 
-    private static bool IsValid(DimChatAuthenticationResult? authenticationResult)
-    {
-        return authenticationResult is not null
-            && !string.IsNullOrWhiteSpace(authenticationResult.UserId)
-            && Enum.IsDefined(authenticationResult.Platform);
+        var platformValue = Context.User?.FindFirst(AuthConstants.PlatformClaim)?.Value;
+
+        return !string.IsNullOrWhiteSpace(userId)
+            && Enum.TryParse(platformValue, ignoreCase: true, out platform)
+            && Enum.IsDefined(platform);
     }
 }
