@@ -73,6 +73,11 @@ public sealed class DimChatHub(
         await base.OnDisconnectedAsync(exception);
     }
 
+    public async Task HeartbeatAsync()
+    {
+        await Task.CompletedTask;
+    }
+
     private bool TryGetAuthenticatedUser(
         out string userId,
         out DimClientPlatform platform)

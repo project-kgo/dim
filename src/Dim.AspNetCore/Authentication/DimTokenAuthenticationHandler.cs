@@ -22,6 +22,7 @@ public sealed class DimTokenAuthenticationHandler(
         {
             return AuthenticateResult.NoResult();
         }
+        Logger.LogDebug("Token: {Token}", token);
 
         var result = await _tokenValidator.ValidateAsync(token, Context.RequestAborted);
         if (result == null)
@@ -44,6 +45,13 @@ public sealed class DimTokenAuthenticationHandler(
 
     private string? GetTokenFromRequest()
     {
+        var authorization = Request.Headers.Authorization.ToString();
+        if (!string.IsNullOrWhiteSpace(authorization) &&
+            authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            return authorization["Bearer ".Length..].Trim();
+        }
+
         var headerToken = Request.Headers["X-Token"].ToString();
         if (!string.IsNullOrWhiteSpace(headerToken))
         {

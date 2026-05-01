@@ -1,4 +1,6 @@
 using Dim.AspNetCore;
+using Dim.AspNetCore.Authentication;
+using Dim.SampleHost.Authentication;
 using Serilog;
 using System.Globalization;
 
@@ -13,6 +15,7 @@ builder.Host.UseSerilog((context, services, loggerConfiguration) =>
         .WriteTo.Console(formatProvider: CultureInfo.InvariantCulture);
 });
 
+builder.Services.AddSingleton<IDimTokenValidator, TokenVerify>();
 builder.Services.AddDimChat(builder.Configuration);
 
 var app = builder.Build();
