@@ -1,11 +1,14 @@
 using Dim.Abstractions.Authentication;
 using Dim.Abstractions.Configuration;
 using Dim.Abstractions.Runtime;
+using Dim.Abstractions.Signaling;
 using Dim.Application.Runtime;
 using Dim.Application.Routing;
+using Dim.Application.Signaling;
 using Dim.AspNetCore.Authentication;
 using Dim.AspNetCore.Hubs;
 using Dim.AspNetCore.Routing;
+using Dim.AspNetCore.Signaling;
 using Dim.Infrastructure.DependencyInjection;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
@@ -37,9 +40,11 @@ public static class DimChatAspNetCoreExtensions
 
         services.TryAddSingleton<IDimChatRuntime, DimChatRuntime>();
         services.TryAddSingleton<DimChatRouteService>();
+        services.TryAddSingleton<IDimSignalSender, DimSignalSender>();
         services.AddDimInfrastructure();
         services.TryAddSingleton<IUserIdProvider, DimAuthenticationUserIdProvider>();
         services.TryAddSingleton<IDimTokenValidator, DefaultDimTokenValidator>();
+        services.TryAddSingleton<IDimLocalSignalDispatcher, DimSignalHubDispatcher>();
         services.AddSignalR();
 
         services
@@ -50,6 +55,7 @@ public static class DimChatAspNetCoreExtensions
 
         services.AddAuthorization();
         services.AddHostedService<OnlineTTLRefreshService>();
+        services.AddHostedService<DimSignalSubscriptionService>();
 
         return services;
     }

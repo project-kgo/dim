@@ -11,3 +11,23 @@ message ChatEnvelope {
   string content = 4;
   int64 sent_at_unix_time_milliseconds = 5;
 }
+
+message SignalEnvelope {
+  string message_id = 1;
+  string signal_type = 2;
+  SignalTarget target = 3;
+  bytes payload = 4;
+  int64 sent_at_unix_time_milliseconds = 5;
+}
+
+message SignalTarget {
+  oneof target {
+    SignalUserTarget users = 1;
+    string connection_id = 2;
+    bool all = 3;
+  }
+}
+
+message SignalUserTarget {
+  repeated string user_ids = 1;
+}

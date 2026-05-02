@@ -15,4 +15,6 @@ public sealed class DimChatOptions
     public DimChatConnectionOptions Connection { get; set; } = new();
 
     public DimChatStorageOptions Storage { get; set; } = new();
+
+    public DimChatSignalingOptions Signaling { get; set; } = new();
 }

@@ -1,7 +1,9 @@
 using Dim.Abstractions.Configuration;
 using Dim.Abstractions.Routing;
+using Dim.Application.Signaling;
 using Dim.Infrastructure.Persistence;
 using Dim.Infrastructure.Routing;
+using Dim.Infrastructure.Signaling;
 using Ku.Utils.Database.Redis;
 using Ku.Utils.Database.PostgreSql;
 using Microsoft.EntityFrameworkCore;
@@ -100,6 +102,22 @@ public static class DimInfrastructureServiceCollectionExtensions
             return new DimRouteStore(
                 serviceProvider.GetRequiredService<IConnectionMultiplexer>(),
                 options);
+        });
+
+        services.TryAddSingleton<IDimSignalBus>(serviceProvider =>
+        {
+            var options = serviceProvider
+                .GetRequiredService<IOptions<DimChatOptions>>();
+
+            if (string.IsNullOrWhiteSpace(options.Value.Storage.RedisConnectionString))
+            {
+                return new MissingDimSignalBus();
+            }
+
+            return new RedisDimSignalBus(
+                serviceProvider.GetRequiredService<IConnectionMultiplexer>(),
+                options,
+                serviceProvider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<RedisDimSignalBus>>());
         });
 
         services.AddSingleton<ILocalConnectionRouteStore, LocalConnectionRouteStore>();

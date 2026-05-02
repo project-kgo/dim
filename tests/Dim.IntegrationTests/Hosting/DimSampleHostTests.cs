@@ -25,7 +25,7 @@ public sealed class DimSampleHostTests
         using var client = factory.CreateClient();
 
         using var response = await client.PostAsync(
-            "/dim/hub/negotiate?negotiateVersion=1",
+            "/dim/hub/negotiate?negotiateVersion=1&access_token=integration-test",
             content: null);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);

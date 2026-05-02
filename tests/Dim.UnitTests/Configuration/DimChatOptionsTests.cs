@@ -16,5 +16,7 @@ public sealed class DimChatOptionsTests
         options.Connection.RouteKeyPrefix.Should().Be("dim:routes");
         options.Connection.RouteTtl.Should().Be(TimeSpan.FromDays(7));
         options.Storage.RedisStreamName.Should().Be("dim:messages");
+        options.Signaling.RedisChannel.Should().Be("dim:signals");
+        options.Signaling.ClientMethodName.Should().Be("ReceiveSignal");
     }
 }
