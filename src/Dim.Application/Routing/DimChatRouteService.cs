@@ -3,9 +3,10 @@ using Dim.Abstractions.Routing;
 
 namespace Dim.Application.Routing;
 
-public sealed class DimChatRouteService(IDimChatRouteStore routeStore)
+public sealed class DimChatRouteService(IDimChatRouteStore routeStore, ILocalConnectionRouteStore localConnectionRouteStore)
 {
     private readonly IDimChatRouteStore _routeStore = routeStore;
+    private readonly ILocalConnectionRouteStore _localConnectionRouteStore = localConnectionRouteStore;
 
     public async ValueTask<DimChatRouteConnectResult> ConnectAsync(
         string userId,
@@ -26,6 +27,8 @@ public sealed class DimChatRouteService(IDimChatRouteStore routeStore)
 
         var previousConnectionIds = await _routeStore.SetRouteAsync(currentRoute, options.RouteTtl, cancellationToken);
 
+        _localConnectionRouteStore.Add(currentRoute);
+
         return new DimChatRouteConnectResult(currentRoute, previousConnectionIds);
     }
 
@@ -34,6 +37,8 @@ public sealed class DimChatRouteService(IDimChatRouteStore routeStore)
         ArgumentException.ThrowIfNullOrWhiteSpace(route.ConnectionId);
 
         await _routeStore.RemoveRouteAsync(route, cancellationToken);
+
+        _localConnectionRouteStore.Remove(route);
     }
 
     public async ValueTask<bool> RefreshRouteAsync(

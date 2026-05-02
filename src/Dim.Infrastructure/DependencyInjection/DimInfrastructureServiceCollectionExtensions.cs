@@ -102,6 +102,8 @@ public static class DimInfrastructureServiceCollectionExtensions
                 options);
         });
 
+        services.AddSingleton<ILocalConnectionRouteStore, LocalConnectionRouteStore>();
+
         return services;
     }
 

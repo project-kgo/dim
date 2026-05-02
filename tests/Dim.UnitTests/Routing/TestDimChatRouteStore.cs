@@ -58,6 +58,23 @@ internal sealed class TestDimChatRouteStore(bool allowMultiDeviceLogin = true) :
         return ValueTask.FromResult(true);
     }
 
+    public Task RefreshTTLRoutesAsync(
+        IEnumerable<DimChatRoute> routes,
+        TimeSpan ttl,
+        CancellationToken cancellationToken)
+    {
+        foreach (var route in routes)
+        {
+            if (_routes.TryGetValue(GetRouteKey(route), out var currentRoute)
+                && currentRoute.ConnectionId == route.ConnectionId)
+            {
+                RefreshCount++;
+            }
+        }
+
+        return Task.CompletedTask;
+    }
+
     private string[]? GetPreviousConnectionIds(string routeKey)
     {
         var connectionIds = allowMultiDeviceLogin
@@ -79,5 +96,25 @@ internal sealed class TestDimChatRouteStore(bool allowMultiDeviceLogin = true) :
         return allowMultiDeviceLogin
             ? $"user:{route.UserId}:platform:{route.Platform.ToString().ToLowerInvariant()}"
             : $"user:{route.UserId}";
+    }
+}
+
+internal sealed class TestLocalConnectionRouteStore : ILocalConnectionRouteStore
+{
+    private readonly Dictionary<string, DimChatRoute> _routes = new(StringComparer.Ordinal);
+
+    public void Add(DimChatRoute route)
+    {
+        _routes[route.ConnectionId] = route;
+    }
+
+    public void Remove(DimChatRoute route)
+    {
+        _routes.Remove(route.ConnectionId);
+    }
+
+    public IReadOnlyCollection<DimChatRoute> GetAll()
+    {
+        return [.. _routes.Values];
     }
 }

@@ -9,6 +9,11 @@ public class MissingDimRouteStore : IDimChatRouteStore
         throw new NotImplementedException();
     }
 
+    public Task RefreshTTLRoutesAsync(IEnumerable<DimChatRoute> routes, TimeSpan ttl, CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
+    }
+
     public ValueTask<bool> RemoveRouteAsync(DimChatRoute route, CancellationToken cancellationToken)
     {
         throw new NotImplementedException();

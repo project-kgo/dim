@@ -105,6 +105,32 @@ public sealed class DimRouteStore(
         return (int)result! > 0;
     }
 
+    public async Task RefreshTTLRoutesAsync(
+        IEnumerable<DimChatRoute> routes,
+        TimeSpan ttl,
+        CancellationToken cancellationToken)
+    {
+        var normalizedTtl = NormalizeTtl(ttl);
+        var ttlSeconds = checked((long)normalizedTtl.TotalSeconds);
+
+        var batch = _database.CreateBatch();
+
+        var tasks = routes.Select(route => batch.ScriptEvaluateAsync(
+                refreshScript,
+                [RouteKey(route)],
+                [
+                    route.Platform.ToString(),
+                    route.ConnectionId,
+                    ttlSeconds,
+                ]
+            )
+        ).ToArray();
+
+        batch.Execute();
+
+        await Task.WhenAll(tasks);
+    }
+
     private string RouteKey(DimChatRoute route)
     {
         return $"{_routeKeyPrefix}:{{{route.UserId}}}";

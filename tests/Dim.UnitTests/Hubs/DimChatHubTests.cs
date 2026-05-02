@@ -31,7 +31,7 @@ public sealed class DimChatHubTests
     public async Task OnConnectedAsyncWhenRouteIsReplacedShouldNotifyOldConnection()
     {
         var store = new TestDimChatRouteStore();
-        var service = new DimChatRouteService(store);
+        var service = new DimChatRouteService(store, new TestLocalConnectionRouteStore());
         await service.ConnectAsync("u1", DimClientPlatform.Web, "old", new DimChatConnectionOptions(), CancellationToken.None);
         var clients = new RecordingHubClients();
         var hub = CreateHub(
@@ -53,7 +53,7 @@ public sealed class DimChatHubTests
         IHubCallerClients clients)
     {
         return new DimChatHub(
-            new DimChatRouteService(store),
+            new DimChatRouteService(store, new TestLocalConnectionRouteStore()),
             Options.Create(new DimChatOptions()))
         {
             Context = context,

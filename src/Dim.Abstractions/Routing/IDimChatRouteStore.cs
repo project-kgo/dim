@@ -7,4 +7,9 @@ public interface IDimChatRouteStore
     ValueTask<bool> RemoveRouteAsync(DimChatRoute route, CancellationToken cancellationToken);
 
     ValueTask<bool> RefreshRouteAsync(DimChatRoute route, TimeSpan ttl, CancellationToken cancellationToken);
+
+    Task RefreshTTLRoutesAsync(
+        IEnumerable<DimChatRoute> routes,
+        TimeSpan ttl,
+        CancellationToken cancellationToken);
 }

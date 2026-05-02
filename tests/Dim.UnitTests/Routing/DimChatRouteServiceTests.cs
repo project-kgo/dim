@@ -11,7 +11,7 @@ public sealed class DimChatRouteServiceTests
     public async Task ConnectAsyncWhenMultiDeviceEnabledShouldKeepDifferentPlatforms()
     {
         var store = new TestDimChatRouteStore();
-        var service = new DimChatRouteService(store);
+        var service = CreateService(store);
         var options = new DimChatConnectionOptions();
 
         await service.ConnectAsync("u1", DimClientPlatform.Ios, "c1", options, CancellationToken.None);
@@ -25,7 +25,7 @@ public sealed class DimChatRouteServiceTests
     public async Task ConnectAsyncWhenSamePlatformConnectedShouldReturnOldConnection()
     {
         var store = new TestDimChatRouteStore();
-        var service = new DimChatRouteService(store);
+        var service = CreateService(store);
         var options = new DimChatConnectionOptions();
 
         await service.ConnectAsync("u1", DimClientPlatform.Android, "old", options, CancellationToken.None);
@@ -39,7 +39,7 @@ public sealed class DimChatRouteServiceTests
     public async Task ConnectAsyncWhenMultiDeviceDisabledShouldUseUserScope()
     {
         var store = new TestDimChatRouteStore(allowMultiDeviceLogin: false);
-        var service = new DimChatRouteService(store);
+        var service = CreateService(store);
         var options = new DimChatConnectionOptions
         {
             AllowMultiDeviceLogin = false
@@ -57,7 +57,7 @@ public sealed class DimChatRouteServiceTests
     public async Task DisconnectAsyncWhenRouteWasReplacedShouldNotRemoveNewRoute()
     {
         var store = new TestDimChatRouteStore();
-        var service = new DimChatRouteService(store);
+        var service = CreateService(store);
         var options = new DimChatConnectionOptions();
 
         var oldRoute = (await service.ConnectAsync("u1", DimClientPlatform.Web, "old", options, CancellationToken.None)).CurrentRoute;
@@ -72,7 +72,7 @@ public sealed class DimChatRouteServiceTests
     public async Task RefreshRouteAsyncWhenConnectionIsCurrentShouldRefreshRoute()
     {
         var store = new TestDimChatRouteStore();
-        var service = new DimChatRouteService(store);
+        var service = CreateService(store);
         var options = new DimChatConnectionOptions();
 
         var route = (await service.ConnectAsync("u1", DimClientPlatform.Web, "c1", options, CancellationToken.None)).CurrentRoute;
@@ -80,5 +80,10 @@ public sealed class DimChatRouteServiceTests
 
         refreshed.Should().BeTrue();
         store.RefreshCount.Should().Be(1);
+    }
+
+    private static DimChatRouteService CreateService(TestDimChatRouteStore store)
+    {
+        return new DimChatRouteService(store, new TestLocalConnectionRouteStore());
     }
 }

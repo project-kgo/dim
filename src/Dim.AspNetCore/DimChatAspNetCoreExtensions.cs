@@ -49,6 +49,7 @@ public static class DimChatAspNetCoreExtensions
                 _ => { });
 
         services.AddAuthorization();
+        services.AddHostedService<OnlineTTLRefreshService>();
 
         return services;
     }
