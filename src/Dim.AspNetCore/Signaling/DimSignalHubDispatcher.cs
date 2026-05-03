@@ -16,13 +16,14 @@ public sealed class DimSignalHubDispatcher(
     private readonly string _clientMethodName = NormalizeClientMethodName(options.Value.Signaling.ClientMethodName);
 
     public async ValueTask DispatchAsync(
-        SignalEnvelope envelope,
+        SignalMessage signalMessage,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(envelope);
+        ArgumentNullException.ThrowIfNull(signalMessage);
+        ArgumentNullException.ThrowIfNull(signalMessage.Envelope);
 
-        var message = envelope.ToByteArray();
-        var target = envelope.Target ?? throw new InvalidOperationException("Dim 信令目标未设置。");
+        var message = signalMessage.Envelope.ToByteArray();
+        var target = signalMessage.Target ?? throw new InvalidOperationException("Dim 信令目标未设置。");
 
         switch (target.TargetCase)
         {
@@ -32,11 +33,11 @@ public sealed class DimSignalHubDispatcher(
                     .SendAsync(_clientMethodName, message, cancellationToken);
                 break;
 
-            case SignalTarget.TargetOneofCase.ConnectionId:
-                await _hubContext.Clients
-                    .Client(target.ConnectionId)
-                    .SendAsync(_clientMethodName, message, cancellationToken);
-                break;
+            // case SignalTarget.TargetOneofCase.ConnectionId:
+            //     await _hubContext.Clients
+            //         .Client(target.ConnectionId)
+            //         .SendAsync(_clientMethodName, message, cancellationToken);
+            //     break;
 
             case SignalTarget.TargetOneofCase.All:
                 await _hubContext.Clients

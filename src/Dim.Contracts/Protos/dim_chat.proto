@@ -9,25 +9,32 @@ message ChatEnvelope {
   string conversation_id = 2;
   string sender_id = 3;
   string content = 4;
-  int64 sent_at_unix_time_milliseconds = 5;
+  int64 sent_at = 5;
 }
 
+
+// 发送给客户端的信令统一格式
 message SignalEnvelope {
   string message_id = 1;
   string signal_type = 2;
-  SignalTarget target = 3;
-  bytes payload = 4;
-  int64 sent_at_unix_time_milliseconds = 5;
+
+  bytes payload = 4; //根据不同的signal_type，payload的格式不同
+  int64 sent_at = 5;
+}
+
+message SignalUserTarget {
+  repeated string user_ids = 1;
 }
 
 message SignalTarget {
   oneof target {
     SignalUserTarget users = 1;
-    string connection_id = 2;
-    bool all = 3;
+    bool all = 2;
   }
 }
 
-message SignalUserTarget {
-  repeated string user_ids = 1;
+// 内部使用的信令消息格式
+message SignalMessage {
+  SignalTarget target = 1;
+  SignalEnvelope envelope = 2;
 }

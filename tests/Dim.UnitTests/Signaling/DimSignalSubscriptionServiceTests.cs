@@ -21,11 +21,11 @@ public sealed class DimSignalSubscriptionServiceTests
         await service.StartAsync(CancellationToken.None);
         await bus.Subscribed.Task.WaitAsync(TimeSpan.FromSeconds(1));
 
-        var envelope = CreateEnvelope();
-        await bus.Handler!(envelope.ToByteArray(), CancellationToken.None);
+        var signalMessage = CreateMessage();
+        await bus.Handler!(signalMessage.ToByteArray(), CancellationToken.None);
 
         dispatcher.Envelopes.Should().ContainSingle()
-            .Which.MessageId.Should().Be(envelope.MessageId);
+            .Which.Envelope.MessageId.Should().Be(signalMessage.Envelope.MessageId);
 
         await service.StopAsync(CancellationToken.None);
     }
@@ -52,12 +52,10 @@ public sealed class DimSignalSubscriptionServiceTests
         await service.StopAsync(CancellationToken.None);
     }
 
-    private static SignalEnvelope CreateEnvelope()
+    private static SignalMessage CreateMessage()
     {
-        return new SignalEnvelope
+        return new SignalMessage
         {
-            MessageId = "m1",
-            SignalType = "chat.message",
             Target = new SignalTarget
             {
                 Users = new SignalUserTarget
@@ -65,8 +63,13 @@ public sealed class DimSignalSubscriptionServiceTests
                     UserIds = { "u1" }
                 }
             },
-            Payload = ByteString.CopyFrom([1, 2, 3]),
-            SentAtUnixTimeMilliseconds = 1
+            Envelope = new SignalEnvelope
+            {
+                MessageId = "m1",
+                SignalType = "chat.message",
+                Payload = ByteString.CopyFrom([1, 2, 3]),
+                SentAt = 1
+            }
         };
     }
 
@@ -95,10 +98,10 @@ public sealed class DimSignalSubscriptionServiceTests
 
     private sealed class RecordingLocalSignalDispatcher : IDimLocalSignalDispatcher
     {
-        public List<SignalEnvelope> Envelopes { get; } = [];
+        public List<SignalMessage> Envelopes { get; } = [];
 
         public ValueTask DispatchAsync(
-            SignalEnvelope envelope,
+            SignalMessage envelope,
             CancellationToken cancellationToken)
         {
             Envelopes.Add(envelope);

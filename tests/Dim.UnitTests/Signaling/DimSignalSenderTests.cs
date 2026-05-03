@@ -16,25 +16,12 @@ public sealed class DimSignalSenderTests
         await sender.SendToUsersAsync(["u1", "u2", "u1"], "chat.message", payload);
 
         var envelope = bus.GetSingleEnvelope();
-        envelope.SignalType.Should().Be("chat.message");
+        envelope.Envelope.SignalType.Should().Be("chat.message");
         envelope.Target.TargetCase.Should().Be(SignalTarget.TargetOneofCase.Users);
         envelope.Target.Users.UserIds.Should().Equal("u1", "u2");
-        envelope.Payload.ToByteArray().Should().Equal(payload);
-        envelope.MessageId.Should().NotBeNullOrWhiteSpace();
-        envelope.SentAtUnixTimeMilliseconds.Should().BeGreaterThan(0);
-    }
-
-    [Fact]
-    public async Task SendToConnectionAsyncShouldPublishConnectionSignalEnvelope()
-    {
-        var bus = new RecordingSignalBus();
-        var sender = new DimSignalSender(bus);
-
-        await sender.SendToConnectionAsync("c1", "typing", ReadOnlyMemory<byte>.Empty);
-
-        var envelope = bus.GetSingleEnvelope();
-        envelope.Target.TargetCase.Should().Be(SignalTarget.TargetOneofCase.ConnectionId);
-        envelope.Target.ConnectionId.Should().Be("c1");
+        envelope.Envelope.Payload.ToByteArray().Should().Equal(payload);
+        envelope.Envelope.MessageId.Should().NotBeNullOrWhiteSpace();
+        envelope.Envelope.SentAt.Should().BeGreaterThan(0);
     }
 
     [Fact]
@@ -62,9 +49,6 @@ public sealed class DimSignalSenderTests
             await sender.SendToUsersAsync(["u1", ""], "chat.message", ReadOnlyMemory<byte>.Empty));
 
         await Assert.ThrowsAsync<ArgumentException>(async () =>
-            await sender.SendToConnectionAsync("", "chat.message", ReadOnlyMemory<byte>.Empty));
-
-        await Assert.ThrowsAsync<ArgumentException>(async () =>
             await sender.BroadcastAsync("", ReadOnlyMemory<byte>.Empty));
     }
 
@@ -87,9 +71,9 @@ public sealed class DimSignalSenderTests
             throw new NotSupportedException();
         }
 
-        public SignalEnvelope GetSingleEnvelope()
+        public SignalMessage GetSingleEnvelope()
         {
-            return SignalEnvelope.Parser.ParseFrom(_messages.Should().ContainSingle().Subject);
+            return SignalMessage.Parser.ParseFrom(_messages.Should().ContainSingle().Subject);
         }
     }
 }

@@ -29,20 +29,20 @@ public sealed class DimSignalSender(IDimSignalBus signalBus) : IDimSignalSender
             cancellationToken);
     }
 
-    public ValueTask SendToConnectionAsync(
-        string connectionId,
-        string signalType,
-        ReadOnlyMemory<byte> payload,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(connectionId);
+    // public ValueTask SendToConnectionAsync(
+    //     string connectionId,
+    //     string signalType,
+    //     ReadOnlyMemory<byte> payload,
+    //     CancellationToken cancellationToken = default)
+    // {
+    //     ArgumentException.ThrowIfNullOrWhiteSpace(connectionId);
 
-        return PublishAsync(
-            signalType,
-            payload,
-            new SignalTarget { ConnectionId = connectionId },
-            cancellationToken);
-    }
+    //     return PublishAsync(
+    //         signalType,
+    //         payload,
+    //         new SignalTarget { ConnectionId = connectionId },
+    //         cancellationToken);
+    // }
 
     public ValueTask BroadcastAsync(
         string signalType,
@@ -64,16 +64,19 @@ public sealed class DimSignalSender(IDimSignalBus signalBus) : IDimSignalSender
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(signalType);
 
-        var envelope = new SignalEnvelope
+        var signalMessage = new SignalMessage
         {
-            MessageId = Guid.NewGuid().ToString("N"),
-            SignalType = signalType,
             Target = target,
-            Payload = ByteString.CopyFrom(payload.Span),
-            SentAtUnixTimeMilliseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+            Envelope = new SignalEnvelope
+            {
+                MessageId = Guid.NewGuid().ToString("N"),
+                SignalType = signalType,
+                Payload = ByteString.CopyFrom(payload.Span),
+                SentAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+            }
         };
 
-        return _signalBus.PublishAsync(envelope.ToByteArray(), cancellationToken);
+        return _signalBus.PublishAsync(signalMessage.ToByteArray(), cancellationToken);
     }
 
     private static string[] NormalizeUserIds(IReadOnlyCollection<string> userIds)

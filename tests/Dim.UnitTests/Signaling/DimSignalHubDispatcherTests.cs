@@ -16,7 +16,7 @@ public sealed class DimSignalHubDispatcherTests
     {
         var clients = new RecordingHubClients();
         var dispatcher = CreateDispatcher(clients);
-        var envelope = CreateEnvelope(new SignalTarget
+        var signalMessage = CreateMessage(new SignalTarget
         {
             Users = new SignalUserTarget
             {
@@ -24,26 +24,12 @@ public sealed class DimSignalHubDispatcherTests
             }
         });
 
-        await dispatcher.DispatchAsync(envelope, CancellationToken.None);
+        await dispatcher.DispatchAsync(signalMessage, CancellationToken.None);
 
         var message = clients.Messages.Should().ContainSingle().Subject;
         message.Target.Should().Be("users:u1,u2");
         message.Method.Should().Be("ReceiveSignal");
-        SignalEnvelope.Parser.ParseFrom(message.GetPayload()).Target.Users.UserIds.Should().Equal("u1", "u2");
-    }
-
-    [Fact]
-    public async Task DispatchAsyncShouldSendConnectionSignalToConnectionClient()
-    {
-        var clients = new RecordingHubClients();
-        var dispatcher = CreateDispatcher(clients);
-        var envelope = CreateEnvelope(new SignalTarget { ConnectionId = "c1" });
-
-        await dispatcher.DispatchAsync(envelope, CancellationToken.None);
-
-        var message = clients.Messages.Should().ContainSingle().Subject;
-        message.Target.Should().Be("connection:c1");
-        SignalEnvelope.Parser.ParseFrom(message.GetPayload()).Target.ConnectionId.Should().Be("c1");
+        SignalMessage.Parser.ParseFrom(message.GetPayload()).Target.Users.UserIds.Should().Equal("u1", "u2");
     }
 
     [Fact]
@@ -51,13 +37,13 @@ public sealed class DimSignalHubDispatcherTests
     {
         var clients = new RecordingHubClients();
         var dispatcher = CreateDispatcher(clients);
-        var envelope = CreateEnvelope(new SignalTarget { All = true });
+        var signalMessage = CreateMessage(new SignalTarget { All = true });
 
-        await dispatcher.DispatchAsync(envelope, CancellationToken.None);
+        await dispatcher.DispatchAsync(signalMessage, CancellationToken.None);
 
         var message = clients.Messages.Should().ContainSingle().Subject;
         message.Target.Should().Be("all");
-        SignalEnvelope.Parser.ParseFrom(message.GetPayload()).Target.All.Should().BeTrue();
+        SignalMessage.Parser.ParseFrom(message.GetPayload()).Target.All.Should().BeTrue();
     }
 
     private static DimSignalHubDispatcher CreateDispatcher(RecordingHubClients clients)
@@ -67,15 +53,18 @@ public sealed class DimSignalHubDispatcherTests
             Options.Create(new DimChatOptions()));
     }
 
-    private static SignalEnvelope CreateEnvelope(SignalTarget target)
+    private static SignalMessage CreateMessage(SignalTarget target)
     {
-        return new SignalEnvelope
+        return new SignalMessage
         {
-            MessageId = "m1",
-            SignalType = "chat.message",
             Target = target,
-            Payload = ByteString.CopyFrom([1, 2, 3]),
-            SentAtUnixTimeMilliseconds = 1
+            Envelope = new SignalEnvelope
+            {
+                MessageId = "m1",
+                SignalType = "chat.message",
+                Payload = ByteString.CopyFrom([1, 2, 3]),
+                SentAt = 1
+            }
         };
     }
 

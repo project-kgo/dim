@@ -62,11 +62,11 @@ public sealed class DimSignalSubscriptionService(
         ReadOnlyMemory<byte> message,
         CancellationToken cancellationToken)
     {
-        SignalEnvelope envelope;
+        SignalMessage signalMessage;
 
         try
         {
-            envelope = SignalEnvelope.Parser.ParseFrom(message.Span);
+            signalMessage = SignalMessage.Parser.ParseFrom(message.Span);
         }
         catch (InvalidProtocolBufferException exception)
         {
@@ -76,14 +76,14 @@ public sealed class DimSignalSubscriptionService(
 
         try
         {
-            await _localDispatcher.DispatchAsync(envelope, cancellationToken);
+            await _localDispatcher.DispatchAsync(signalMessage, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
         }
         catch (Exception exception)
         {
-            LogDispatchFailed(_logger, envelope.MessageId, exception);
+            LogDispatchFailed(_logger, signalMessage.Envelope.MessageId, exception);
         }
     }
 }
