@@ -31,8 +31,26 @@ public sealed class DimChatRouteServiceTests
         await service.ConnectAsync("u1", DimClientPlatform.Android, "old", options, CancellationToken.None);
         var result = await service.ConnectAsync("u1", DimClientPlatform.Android, "new", options, CancellationToken.None);
 
-        result.PreviousConnectionIds.Should().Equal("old");
+        var replacedRoute = result.ReplacedRoutes.Should().ContainSingle().Subject;
+        replacedRoute.ConnectionId.Should().Be("old");
+        replacedRoute.ServerId.Should().NotBeNullOrWhiteSpace();
         store.Routes["user:u1:platform:android"].ConnectionId.Should().Be("new");
+    }
+
+    [Fact]
+    public async Task ConnectAsyncShouldUseStableServerId()
+    {
+        var store = new TestDimChatRouteStore();
+        var service = CreateService(store);
+        var options = new DimChatConnectionOptions();
+
+        var first = await service.ConnectAsync("u1", DimClientPlatform.Ios, "c1", options, CancellationToken.None);
+        var second = await service.ConnectAsync("u1", DimClientPlatform.Web, "c2", options, CancellationToken.None);
+
+        first.CurrentRoute.ServerId.Should().NotBeNullOrWhiteSpace();
+        second.CurrentRoute.ServerId.Should().Be(first.CurrentRoute.ServerId);
+        store.ServerRoutes["user:u1:platform:ios"].Should().Be(first.CurrentRoute.ServerId);
+        store.ServerRoutes["user:u1:platform:web"].Should().Be(first.CurrentRoute.ServerId);
     }
 
     [Fact]
@@ -48,7 +66,9 @@ public sealed class DimChatRouteServiceTests
         await service.ConnectAsync("u1", DimClientPlatform.Ios, "ios-1", options, CancellationToken.None);
         var result = await service.ConnectAsync("u1", DimClientPlatform.Web, "web-1", options, CancellationToken.None);
 
-        result.PreviousConnectionIds.Should().Equal("ios-1");
+        result.ReplacedRoutes.Should()
+            .ContainSingle()
+            .Which.ConnectionId.Should().Be("ios-1");
         store.Routes.Should().ContainSingle();
         store.Routes["user:u1"].Platform.Should().Be(DimClientPlatform.Web);
     }
@@ -84,6 +104,6 @@ public sealed class DimChatRouteServiceTests
 
     private static DimChatRouteService CreateService(TestDimChatRouteStore store)
     {
-        return new DimChatRouteService(store, new TestLocalConnectionRouteStore());
+        return new DimChatRouteService(store, new TestLocalConnectionRouteStore(), new DimServerIdentity());
     }
 }

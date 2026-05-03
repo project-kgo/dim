@@ -86,6 +86,14 @@ public sealed class DimSignalSubscriptionServiceTests
             throw new NotSupportedException();
         }
 
+        public ValueTask PublishToServerAsync(
+            string serverId,
+            ReadOnlyMemory<byte> message,
+            CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
         public ValueTask<IDimSignalSubscription> SubscribeAsync(
             Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask> handler,
             CancellationToken cancellationToken)

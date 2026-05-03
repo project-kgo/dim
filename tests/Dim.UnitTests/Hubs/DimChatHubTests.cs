@@ -2,12 +2,15 @@ using System.Security.Claims;
 using Dim.Abstractions.Authentication;
 using Dim.Abstractions.Configuration;
 using Dim.Abstractions.Routing;
+using Dim.Abstractions.Signaling;
 using Dim.Application.Routing;
+using Dim.Application.Signaling;
 using Dim.AspNetCore.Hubs;
 using Dim.UnitTests.Routing;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 namespace Dim.UnitTests.Hubs;
@@ -31,29 +34,66 @@ public sealed class DimChatHubTests
     public async Task OnConnectedAsyncWhenRouteIsReplacedShouldNotifyOldConnection()
     {
         var store = new TestDimChatRouteStore();
-        var service = new DimChatRouteService(store, new TestLocalConnectionRouteStore());
-        await service.ConnectAsync("u1", DimClientPlatform.Web, "old", new DimChatConnectionOptions(), CancellationToken.None);
+        var service = new DimChatRouteService(store, new TestLocalConnectionRouteStore(), new DimServerIdentity());
+        var oldRoute = (await service.ConnectAsync(
+            "u1",
+            DimClientPlatform.Web,
+            "old",
+            new DimChatConnectionOptions(),
+            CancellationToken.None)).CurrentRoute;
         var clients = new RecordingHubClients();
+        var signalSender = new RecordingSignalSender();
         var hub = CreateHub(
             store,
             new TestHubCallerContext("new", CreateUser("u1", DimClientPlatform.Web)),
-            clients);
+            clients,
+            signalSender);
 
         await hub.OnConnectedAsync();
 
-        var message = clients.Messages.Should().ContainSingle().Subject;
+        clients.Messages.Should().BeEmpty();
+
+        var message = signalSender.ConnectionMessages.Should().ContainSingle().Subject;
+        message.ServerId.Should().Be(oldRoute.ServerId);
         message.ConnectionId.Should().Be("old");
-        message.Method.Should().Be("ForceOffline");
-        message.Arguments.Should().ContainSingle().Which.Should().Be("replaced");
+        message.SignalType.Should().Be(DimInternalSignalTypes.ForceOffline);
+        message.Payload.ToArray().Should().Equal("replaced"u8.ToArray());
+    }
+
+    [Fact]
+    public async Task OnConnectedAsyncWhenForceOfflinePublishFailsShouldKeepNewConnection()
+    {
+        var store = new TestDimChatRouteStore();
+        var service = new DimChatRouteService(store, new TestLocalConnectionRouteStore(), new DimServerIdentity());
+        await service.ConnectAsync(
+            "u1",
+            DimClientPlatform.Web,
+            "old",
+            new DimChatConnectionOptions(),
+            CancellationToken.None);
+        var context = new TestHubCallerContext("new", CreateUser("u1", DimClientPlatform.Web));
+        var hub = CreateHub(
+            store,
+            context,
+            new RecordingHubClients(),
+            new ThrowingSignalSender());
+
+        await hub.OnConnectedAsync();
+
+        context.Aborted.Should().BeFalse();
+        store.Routes["user:u1:platform:web"].ConnectionId.Should().Be("new");
     }
 
     private static DimChatHub CreateHub(
         TestDimChatRouteStore store,
         HubCallerContext context,
-        IHubCallerClients clients)
+        IHubCallerClients clients,
+        IDimSignalSender? signalSender = null)
     {
         return new DimChatHub(
-            new DimChatRouteService(store, new TestLocalConnectionRouteStore()),
+            new DimChatRouteService(store, new TestLocalConnectionRouteStore(), new DimServerIdentity()),
+            signalSender ?? new RecordingSignalSender(),
+            NullLogger<DimChatHub>.Instance,
             Options.Create(new DimChatOptions()))
         {
             Context = context,
@@ -187,4 +227,77 @@ public sealed class DimChatHubTests
         string ConnectionId,
         string Method,
         object?[] Arguments);
+
+    private sealed class RecordingSignalSender : IDimSignalSender
+    {
+        public List<RecordedSignalConnectionMessage> ConnectionMessages { get; } = [];
+
+        public ValueTask SendToUsersAsync(
+            IReadOnlyCollection<string> userIds,
+            string signalType,
+            ReadOnlyMemory<byte> payload,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask SendToConnectionAsync(
+            string serverId,
+            string connectionId,
+            string signalType,
+            ReadOnlyMemory<byte> payload,
+            CancellationToken cancellationToken = default)
+        {
+            ConnectionMessages.Add(new RecordedSignalConnectionMessage(
+                serverId,
+                connectionId,
+                signalType,
+                payload.ToArray()));
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask BroadcastAsync(
+            string signalType,
+            ReadOnlyMemory<byte> payload,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+    }
+
+    private sealed record RecordedSignalConnectionMessage(
+        string ServerId,
+        string ConnectionId,
+        string SignalType,
+        ReadOnlyMemory<byte> Payload);
+
+    private sealed class ThrowingSignalSender : IDimSignalSender
+    {
+        public ValueTask SendToUsersAsync(
+            IReadOnlyCollection<string> userIds,
+            string signalType,
+            ReadOnlyMemory<byte> payload,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask SendToConnectionAsync(
+            string serverId,
+            string connectionId,
+            string signalType,
+            ReadOnlyMemory<byte> payload,
+            CancellationToken cancellationToken = default)
+        {
+            throw new InvalidOperationException("publish failed");
+        }
+
+        public ValueTask BroadcastAsync(
+            string signalType,
+            ReadOnlyMemory<byte> payload,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+    }
 }

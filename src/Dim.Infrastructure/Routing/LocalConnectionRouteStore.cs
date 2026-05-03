@@ -5,19 +5,24 @@ namespace Dim.Infrastructure.Routing;
 
 public class LocalConnectionRouteStore : ILocalConnectionRouteStore
 {
-    private readonly ConcurrentDictionary<string, DimChatRoute> _connections = new();
+    private readonly ConcurrentDictionary<string, DimConectionRoute> _connections = new();
 
-    public void Add(DimChatRoute route)
+    public void Add(DimConectionRoute route)
     {
         _connections[route.ConnectionId] = route;
     }
 
-    public IReadOnlyCollection<DimChatRoute> GetAll()
+    public IReadOnlyCollection<DimConectionRoute> GetAll()
     {
         return [.. _connections.Values];
     }
 
-    public void Remove(DimChatRoute route)
+    public bool TryGet(string connectionId, out DimConectionRoute? route)
+    {
+        return _connections.TryGetValue(connectionId, out route);
+    }
+
+    public void Remove(DimConectionRoute route)
     {
         _connections.TryRemove(route.ConnectionId, out _);
     }

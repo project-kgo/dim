@@ -26,10 +26,15 @@ message SignalUserTarget {
   repeated string user_ids = 1;
 }
 
+message SignalConnectionTarget {
+  repeated string connection_ids = 1;
+}
+
 message SignalTarget {
   oneof target {
     SignalUserTarget users = 1;
     bool all = 2;
+    SignalConnectionTarget connections = 3;
   }
 }
 

@@ -1,7 +1,6 @@
 namespace Dim.Abstractions.Routing;
 
-public sealed record DimChatRoute(
-    string UserId,
+public sealed record DimReplacedConnectionRoute(
     DimClientPlatform Platform,
     string ConnectionId,
-    DateTimeOffset ConnectedAtUtc);
+    string ServerId);

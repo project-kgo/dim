@@ -1,20 +1,33 @@
 using Dim.Abstractions.Authentication;
 using Dim.Abstractions.Configuration;
 using Dim.Abstractions.Routing;
+using Dim.Abstractions.Signaling;
 using Dim.Application.Routing;
+using Dim.Application.Signaling;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Text;
 
 namespace Dim.AspNetCore.Hubs;
 
 public sealed class DimChatHub(
     DimChatRouteService routeService,
+    IDimSignalSender signalSender,
+    ILogger<DimChatHub> logger,
     IOptions<DimChatOptions> options) : Hub
 {
-    private const string ForceOfflineClientMethod = "ForceOffline";
+    private static readonly Action<ILogger, string, string, Exception?> LogForceOfflineFailed =
+        LoggerMessage.Define<string, string>(
+            LogLevel.Warning,
+            new EventId(1, nameof(LogForceOfflineFailed)),
+            "发布旧连接下线信令失败，ServerId: {ServerId}, ConnectionId: {ConnectionId}。");
+
     private const string ForceOfflineReason = "replaced";
 
     private readonly DimChatRouteService _routeService = routeService;
+    private readonly IDimSignalSender _signalSender = signalSender;
+    private readonly ILogger<DimChatHub> _logger = logger;
     private readonly DimChatConnectionOptions _connectionOptions = options.Value.Connection;
 
     public override async Task OnConnectedAsync()
@@ -34,15 +47,7 @@ public sealed class DimChatHub(
                 _connectionOptions,
                 Context.ConnectionAborted);
 
-            if (routeResult.PreviousConnectionIds is { } previousConnectionIds)
-            {
-                await Clients
-                    .Clients(previousConnectionIds)
-                    .SendAsync(
-                        ForceOfflineClientMethod,
-                        ForceOfflineReason,
-                        Context.ConnectionAborted);
-            }
+            await SendForceOfflineAsync(routeResult.ReplacedRoutes, Context.ConnectionAborted);
         }
         catch (InvalidOperationException)
         {
@@ -55,15 +60,14 @@ public sealed class DimChatHub(
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        if (!TryGetAuthenticatedUser(out var userId, out var platform))
+        if (!TryGetAuthenticatedUser(out _, out _))
         {
             Context.Abort();
             return;
         }
-        var route = new DimChatRoute(userId, platform, Context.ConnectionId, DateTimeOffset.UtcNow);
         try
         {
-            await _routeService.DisconnectAsync(route, CancellationToken.None);
+            await _routeService.DisconnectAsync(Context.ConnectionId, CancellationToken.None);
         }
         catch (InvalidOperationException)
         {
@@ -73,9 +77,35 @@ public sealed class DimChatHub(
         await base.OnDisconnectedAsync(exception);
     }
 
-    public async Task HeartbeatAsync()
+    private async ValueTask SendForceOfflineAsync(
+        IReadOnlyCollection<DimReplacedConnectionRoute>? replacedRoutes,
+        CancellationToken cancellationToken)
     {
-        await Task.CompletedTask;
+        if (replacedRoutes is not { Count: > 0 })
+        {
+            return;
+        }
+
+        foreach (var route in replacedRoutes)
+        {
+            try
+            {
+                await _signalSender.SendToConnectionAsync(
+                    route.ServerId,
+                    route.ConnectionId,
+                    DimInternalSignalTypes.ForceOffline,
+                    Encoding.UTF8.GetBytes(ForceOfflineReason),
+                    cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception exception)
+            {
+                LogForceOfflineFailed(_logger, route.ServerId, route.ConnectionId, exception);
+            }
+        }
     }
 
     private bool TryGetAuthenticatedUser(

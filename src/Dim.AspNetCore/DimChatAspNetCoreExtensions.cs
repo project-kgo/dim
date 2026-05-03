@@ -39,6 +39,7 @@ public static class DimChatAspNetCoreExtensions
             .ValidateDataAnnotations();
 
         services.TryAddSingleton<IDimChatRuntime, DimChatRuntime>();
+        services.TryAddSingleton<DimServerIdentity>();
         services.TryAddSingleton<DimChatRouteService>();
         services.TryAddSingleton<IDimSignalSender, DimSignalSender>();
         services.AddDimInfrastructure();

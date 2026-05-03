@@ -3,10 +3,14 @@ using Dim.Abstractions.Routing;
 
 namespace Dim.Application.Routing;
 
-public sealed class DimChatRouteService(IDimChatRouteStore routeStore, ILocalConnectionRouteStore localConnectionRouteStore)
+public sealed class DimChatRouteService(
+    IDimChatRouteStore routeStore,
+    ILocalConnectionRouteStore localConnectionRouteStore,
+    DimServerIdentity serverIdentity)
 {
     private readonly IDimChatRouteStore _routeStore = routeStore;
     private readonly ILocalConnectionRouteStore _localConnectionRouteStore = localConnectionRouteStore;
+    private readonly DimServerIdentity _serverIdentity = serverIdentity;
 
     public async ValueTask<DimChatRouteConnectResult> ConnectAsync(
         string userId,
@@ -19,20 +23,21 @@ public sealed class DimChatRouteService(IDimChatRouteStore routeStore, ILocalCon
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionId);
         ArgumentNullException.ThrowIfNull(options);
 
-        var currentRoute = new DimChatRoute(
+        var currentRoute = new DimConectionRoute(
             userId,
             platform,
             connectionId,
+            _serverIdentity.ServerId,
             DateTimeOffset.UtcNow);
 
-        var previousConnectionIds = await _routeStore.SetRouteAsync(currentRoute, options.RouteTtl, cancellationToken);
+        var replacedRoutes = await _routeStore.SetRouteAsync(currentRoute, options.RouteTtl, cancellationToken);
 
         _localConnectionRouteStore.Add(currentRoute);
 
-        return new DimChatRouteConnectResult(currentRoute, previousConnectionIds);
+        return new DimChatRouteConnectResult(currentRoute, replacedRoutes);
     }
 
-    public async ValueTask DisconnectAsync(DimChatRoute route, CancellationToken cancellationToken)
+    public async ValueTask DisconnectAsync(DimConectionRoute route, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(route.ConnectionId);
 
@@ -41,8 +46,20 @@ public sealed class DimChatRouteService(IDimChatRouteStore routeStore, ILocalCon
         _localConnectionRouteStore.Remove(route);
     }
 
+    public async ValueTask DisconnectAsync(string connectionId, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(connectionId);
+
+        if (!_localConnectionRouteStore.TryGet(connectionId, out var route) || route is null)
+        {
+            return;
+        }
+
+        await DisconnectAsync(route, cancellationToken);
+    }
+
     public async ValueTask<bool> RefreshRouteAsync(
-        DimChatRoute route,
+        DimConectionRoute route,
         TimeSpan ttl,
         CancellationToken cancellationToken)
     {

@@ -1,4 +1,5 @@
 using Dim.Abstractions.Configuration;
+using Dim.Application.Signaling;
 using Dim.AspNetCore.Hubs;
 using Dim.AspNetCore.Signaling;
 using Dim.Contracts;
@@ -29,7 +30,7 @@ public sealed class DimSignalHubDispatcherTests
         var message = clients.Messages.Should().ContainSingle().Subject;
         message.Target.Should().Be("users:u1,u2");
         message.Method.Should().Be("ReceiveSignal");
-        SignalMessage.Parser.ParseFrom(message.GetPayload()).Target.Users.UserIds.Should().Equal("u1", "u2");
+        SignalEnvelope.Parser.ParseFrom(message.GetPayload()).SignalType.Should().Be("chat.message");
     }
 
     [Fact]
@@ -43,7 +44,51 @@ public sealed class DimSignalHubDispatcherTests
 
         var message = clients.Messages.Should().ContainSingle().Subject;
         message.Target.Should().Be("all");
-        SignalMessage.Parser.ParseFrom(message.GetPayload()).Target.All.Should().BeTrue();
+        SignalEnvelope.Parser.ParseFrom(message.GetPayload()).SignalType.Should().Be("chat.message");
+    }
+
+    [Fact]
+    public async Task DispatchAsyncShouldSendSignalToConnections()
+    {
+        var clients = new RecordingHubClients();
+        var dispatcher = CreateDispatcher(clients);
+        var signalMessage = CreateMessage(new SignalTarget
+        {
+            Connections = new SignalConnectionTarget
+            {
+                ConnectionIds = { "c1", "c2" }
+            }
+        });
+
+        await dispatcher.DispatchAsync(signalMessage, CancellationToken.None);
+
+        var message = clients.Messages.Should().ContainSingle().Subject;
+        message.Target.Should().Be("connections:c1,c2");
+        message.Method.Should().Be("ReceiveSignal");
+        SignalEnvelope.Parser.ParseFrom(message.GetPayload()).SignalType.Should().Be("chat.message");
+    }
+
+    [Fact]
+    public async Task DispatchAsyncShouldForceOfflineConnections()
+    {
+        var clients = new RecordingHubClients();
+        var dispatcher = CreateDispatcher(clients);
+        var signalMessage = CreateMessage(new SignalTarget
+        {
+            Connections = new SignalConnectionTarget
+            {
+                ConnectionIds = { "c1" }
+            }
+        });
+        signalMessage.Envelope.SignalType = DimInternalSignalTypes.ForceOffline;
+        signalMessage.Envelope.Payload = ByteString.CopyFrom("replaced"u8.ToArray());
+
+        await dispatcher.DispatchAsync(signalMessage, CancellationToken.None);
+
+        var message = clients.Messages.Should().ContainSingle().Subject;
+        message.Target.Should().Be("connections:c1");
+        message.Method.Should().Be("ForceOffline");
+        message.Arguments.Should().ContainSingle().Which.Should().Be("replaced");
     }
 
     private static DimSignalHubDispatcher CreateDispatcher(RecordingHubClients clients)

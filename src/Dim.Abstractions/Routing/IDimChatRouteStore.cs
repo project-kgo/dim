@@ -2,14 +2,21 @@ namespace Dim.Abstractions.Routing;
 
 public interface IDimChatRouteStore
 {
-    ValueTask<string[]?> SetRouteAsync(DimChatRoute route, TimeSpan ttl, CancellationToken cancellationToken);
+    ValueTask<DimReplacedConnectionRoute[]?> SetRouteAsync(
+        DimConectionRoute route,
+        TimeSpan ttl,
+        CancellationToken cancellationToken);
 
-    ValueTask<bool> RemoveRouteAsync(DimChatRoute route, CancellationToken cancellationToken);
+    ValueTask<IReadOnlyCollection<DimUserConnectionRoute>> GetRoutesAsync(
+        IReadOnlyCollection<string> userIds,
+        CancellationToken cancellationToken);
 
-    ValueTask<bool> RefreshRouteAsync(DimChatRoute route, TimeSpan ttl, CancellationToken cancellationToken);
+    ValueTask<bool> RemoveRouteAsync(DimConectionRoute route, CancellationToken cancellationToken);
+
+    ValueTask<bool> RefreshRouteAsync(DimConectionRoute route, TimeSpan ttl, CancellationToken cancellationToken);
 
     Task RefreshTTLRoutesAsync(
-        IEnumerable<DimChatRoute> routes,
+        IEnumerable<DimConectionRoute> routes,
         TimeSpan ttl,
         CancellationToken cancellationToken);
 }

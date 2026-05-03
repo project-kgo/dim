@@ -6,6 +6,11 @@ public interface IDimSignalBus
         ReadOnlyMemory<byte> message,
         CancellationToken cancellationToken);
 
+    ValueTask PublishToServerAsync(
+        string serverId,
+        ReadOnlyMemory<byte> message,
+        CancellationToken cancellationToken);
+
     ValueTask<IDimSignalSubscription> SubscribeAsync(
         Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask> handler,
         CancellationToken cancellationToken);

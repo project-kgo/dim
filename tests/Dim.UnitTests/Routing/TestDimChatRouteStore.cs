@@ -4,32 +4,54 @@ namespace Dim.UnitTests.Routing;
 
 internal sealed class TestDimChatRouteStore(bool allowMultiDeviceLogin = true) : IDimChatRouteStore
 {
-    private readonly Dictionary<string, DimChatRoute> _routes = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, DimConectionRoute> _routes = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _serverRoutes = new(StringComparer.Ordinal);
 
-    public IReadOnlyDictionary<string, DimChatRoute> Routes => _routes;
+    public IReadOnlyDictionary<string, DimConectionRoute> Routes => _routes;
+
+    public IReadOnlyDictionary<string, string> ServerRoutes => _serverRoutes;
 
     public int RefreshCount { get; private set; }
 
-    public ValueTask<string[]?> SetRouteAsync(
-        DimChatRoute route,
+    public ValueTask<DimReplacedConnectionRoute[]?> SetRouteAsync(
+        DimConectionRoute route,
         TimeSpan ttl,
         CancellationToken cancellationToken)
     {
         var key = GetRouteKey(route);
-        var previousConnectionIds = GetPreviousConnectionIds(key);
+        var replacedRoutes = GetReplacedRoutes(key);
 
         if (!allowMultiDeviceLogin)
         {
             _routes.Clear();
+            _serverRoutes.Clear();
         }
 
         _routes[key] = route;
+        _serverRoutes[key] = route.ServerId;
 
-        return ValueTask.FromResult(previousConnectionIds);
+        return ValueTask.FromResult(replacedRoutes);
+    }
+
+    public ValueTask<IReadOnlyCollection<DimUserConnectionRoute>> GetRoutesAsync(
+        IReadOnlyCollection<string> userIds,
+        CancellationToken cancellationToken)
+    {
+        var normalizedUserIds = userIds.ToHashSet(StringComparer.Ordinal);
+        var routes = _routes.Values
+            .Where(route => normalizedUserIds.Contains(route.UserId))
+            .Select(route => new DimUserConnectionRoute(
+                route.UserId,
+                route.Platform,
+                route.ConnectionId,
+                route.ServerId))
+            .ToArray();
+
+        return ValueTask.FromResult<IReadOnlyCollection<DimUserConnectionRoute>>(routes);
     }
 
     public ValueTask<bool> RemoveRouteAsync(
-        DimChatRoute route,
+        DimConectionRoute route,
         CancellationToken cancellationToken)
     {
         var key = GetRouteKey(route);
@@ -40,11 +62,12 @@ internal sealed class TestDimChatRouteStore(bool allowMultiDeviceLogin = true) :
         }
 
         _routes.Remove(key);
+        _serverRoutes.Remove(key);
         return ValueTask.FromResult(true);
     }
 
     public ValueTask<bool> RefreshRouteAsync(
-        DimChatRoute route,
+        DimConectionRoute route,
         TimeSpan ttl,
         CancellationToken cancellationToken)
     {
@@ -59,7 +82,7 @@ internal sealed class TestDimChatRouteStore(bool allowMultiDeviceLogin = true) :
     }
 
     public Task RefreshTTLRoutesAsync(
-        IEnumerable<DimChatRoute> routes,
+        IEnumerable<DimConectionRoute> routes,
         TimeSpan ttl,
         CancellationToken cancellationToken)
     {
@@ -75,23 +98,28 @@ internal sealed class TestDimChatRouteStore(bool allowMultiDeviceLogin = true) :
         return Task.CompletedTask;
     }
 
-    private string[]? GetPreviousConnectionIds(string routeKey)
+    private DimReplacedConnectionRoute[]? GetReplacedRoutes(string routeKey)
     {
-        var connectionIds = allowMultiDeviceLogin
-            ? GetRouteConnectionIds(routeKey)
-            : [.. _routes.Values.Select(route => route.ConnectionId)];
+        var routes = allowMultiDeviceLogin
+            ? GetRouteReplacedRoutes(routeKey)
+            : [.. _routes.Values.Select(ToReplacedRoute)];
 
-        return connectionIds.Length == 0 ? null : connectionIds;
+        return routes.Length == 0 ? null : routes;
     }
 
-    private string[] GetRouteConnectionIds(string routeKey)
+    private DimReplacedConnectionRoute[] GetRouteReplacedRoutes(string routeKey)
     {
         return _routes.TryGetValue(routeKey, out var route)
-            ? [route.ConnectionId]
+            ? [ToReplacedRoute(route)]
             : [];
     }
 
-    private string GetRouteKey(DimChatRoute route)
+    private static DimReplacedConnectionRoute ToReplacedRoute(DimConectionRoute route)
+    {
+        return new DimReplacedConnectionRoute(route.Platform, route.ConnectionId, route.ServerId);
+    }
+
+    private string GetRouteKey(DimConectionRoute route)
     {
         return allowMultiDeviceLogin
             ? $"user:{route.UserId}:platform:{route.Platform.ToString().ToLowerInvariant()}"
@@ -101,19 +129,24 @@ internal sealed class TestDimChatRouteStore(bool allowMultiDeviceLogin = true) :
 
 internal sealed class TestLocalConnectionRouteStore : ILocalConnectionRouteStore
 {
-    private readonly Dictionary<string, DimChatRoute> _routes = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, DimConectionRoute> _routes = new(StringComparer.Ordinal);
 
-    public void Add(DimChatRoute route)
+    public void Add(DimConectionRoute route)
     {
         _routes[route.ConnectionId] = route;
     }
 
-    public void Remove(DimChatRoute route)
+    public void Remove(DimConectionRoute route)
     {
         _routes.Remove(route.ConnectionId);
     }
 
-    public IReadOnlyCollection<DimChatRoute> GetAll()
+    public bool TryGet(string connectionId, out DimConectionRoute? route)
+    {
+        return _routes.TryGetValue(connectionId, out route);
+    }
+
+    public IReadOnlyCollection<DimConectionRoute> GetAll()
     {
         return [.. _routes.Values];
     }

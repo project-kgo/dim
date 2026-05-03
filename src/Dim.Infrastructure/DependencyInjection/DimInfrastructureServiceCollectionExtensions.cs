@@ -117,6 +117,7 @@ public static class DimInfrastructureServiceCollectionExtensions
             return new RedisDimSignalBus(
                 serviceProvider.GetRequiredService<IConnectionMultiplexer>(),
                 options,
+                serviceProvider.GetRequiredService<Dim.Application.Routing.DimServerIdentity>(),
                 serviceProvider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<RedisDimSignalBus>>());
         });
 
