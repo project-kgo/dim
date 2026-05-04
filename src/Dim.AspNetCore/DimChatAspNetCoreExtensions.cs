@@ -20,7 +20,9 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Ku.Utils.Snowflake;
 
 namespace Dim.AspNetCore;
 
@@ -37,7 +39,6 @@ public static class DimChatAspNetCoreExtensions
             .AddOptions<DimChatOptions>()
             .Bind(configuration.GetSection(DimChatOptions.SectionName))
             .ValidateDataAnnotations();
-
         services.TryAddSingleton<IDimChatRuntime, DimChatRuntime>();
         services.TryAddSingleton<DimServerIdentity>();
         services.TryAddSingleton<DimChatRouteService>();
@@ -47,6 +48,27 @@ public static class DimChatAspNetCoreExtensions
         services.TryAddSingleton<IDimTokenValidator, DefaultDimTokenValidator>();
         services.TryAddSingleton<IDimLocalSignalDispatcher, DimSignalHubDispatcher>();
         services.AddSignalR();
+
+
+        services.TryAddSingleton<DistributedSnowflake>(sp =>
+        {
+            var options = sp.GetRequiredService<IOptions<DimChatOptions>>()
+                .Value;
+            var connectionString = options.Storage.PgMasterSqlConnectionString;
+
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                throw new InvalidOperationException("DimChat:Storage:PgMasterSqlConnectionString 未配置。");
+            }
+
+            return DistributedSnowflake.CreateAsync(
+                new DistributedSnowflakeOptions
+                {
+                    ConnectionString = connectionString,
+                },
+                logger: sp.GetService<ILogger<DistributedSnowflake>>()
+            ).ConfigureAwait(false).GetAwaiter().GetResult();
+        });
 
         services
             .AddAuthentication(AuthConstants.Scheme)

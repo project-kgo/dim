@@ -12,12 +12,16 @@ public sealed class Conversation
 
     public required string UserId { get; set; }
 
-    public required string ConversationId { get; set; }
+    public required ConversationId ConversationId { get; set; }
 
     public required ConversationType ConversationType
     { get; set; }
 
     public required long LastMessageId { get; set; }
+
+    public required DateTimeOffset LastMessageAt { get; set; } = DateTimeOffset.UtcNow;
+
+    public string? LastMessagePreview { get; set; }
 
     public required int UnreadCount { get; set; }
 

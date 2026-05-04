@@ -8,7 +8,7 @@ public sealed class MessageConfiguration: IEntityTypeConfiguration<Message>
 {
     public void Configure(EntityTypeBuilder<Message> builder)
     {
-        builder.ToTable("dim.Messages");
+        builder.ToTable("messages", "dim");
         builder.HasKey(x => new {x.Id, x.CreatedAt});
 
         builder.Property(x => x.Id).HasColumnName("id").IsRequired();
