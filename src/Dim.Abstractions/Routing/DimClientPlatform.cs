@@ -1,6 +1,6 @@
 namespace Dim.Abstractions.Routing;
 
-public enum DimClientPlatform
+public enum DimClientPlatform: int
 {
     Ios = 1,
     Android = 2,
