@@ -61,7 +61,7 @@ public static class DimInfrastructureServiceCollectionExtensions
             return new DimSlaveDataSource(dataSource);
         });
 
-        services.AddDbContext<DimDbContext>((sp, options) =>
+        services.AddDbContext<DimMasterDbContext>((sp, options) =>
         {
             var dataSource = sp.GetRequiredService<DimMasterDataSource>().Value;
             options.UseNpgsql(dataSource);
@@ -89,20 +89,7 @@ public static class DimInfrastructureServiceCollectionExtensions
             });
         });
 
-        services.TryAddSingleton<IDimChatRouteStore>(serviceProvider =>
-        {
-            var options = serviceProvider
-                .GetRequiredService<IOptions<DimChatOptions>>();
-
-            if (string.IsNullOrWhiteSpace(options.Value.Storage.RedisConnectionString))
-            {
-                return new MissingDimRouteStore();
-            }
-
-            return new DimRouteStore(
-                serviceProvider.GetRequiredService<IConnectionMultiplexer>(),
-                options);
-        });
+        services.TryAddSingleton<IDimChatRouteStore, DimRouteStore>();
 
         services.TryAddSingleton<IDimSignalBus>(serviceProvider =>
         {
