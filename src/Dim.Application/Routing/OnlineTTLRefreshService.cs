@@ -26,9 +26,6 @@ public class OnlineTTLRefreshService(
                 var routes = _localStore.GetAll();
                 await _chatRouteStore.RefreshTTLRoutesAsync(routes, _ttl, stoppingToken);
             }
-
-            // temp
-            
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {

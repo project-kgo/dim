@@ -109,7 +109,14 @@ public static class DimInfrastructureServiceCollectionExtensions
             });
         });
 
-        services.TryAddSingleton<IDimChatRouteStore, DimRouteStore>();
+        if (!services.Any(static descriptor => descriptor.ServiceType == typeof(IDimChatRouteStore)))
+        {
+            services.TryAddSingleton<DimRouteStore>();
+            services.TryAddSingleton<IDimChatRouteStore>(serviceProvider =>
+                serviceProvider.GetRequiredService<DimRouteStore>());
+        }
+
+        services.AddHostedService<DimRouteStoreScriptPreloadService>();
         services.TryAddSingleton<ITokenValidatorStore, RedisTokenValidatorStore>();
 
         services.TryAddSingleton<IDimSignalBus>(serviceProvider =>

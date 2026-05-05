@@ -12,6 +12,7 @@
     <PackageReference Include="DotNetCore.CAP.PostgreSql" />
     <PackageReference Include="DotNetCore.CAP.RedisStreams" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <PackageReference Include="StackExchange.Redis" />
   </ItemGroup>

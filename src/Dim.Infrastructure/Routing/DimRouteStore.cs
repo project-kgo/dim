@@ -7,7 +7,7 @@ namespace Dim.Infrastructure.Routing;
 
 public sealed class DimRouteStore(
     IConnectionMultiplexer connectionMultiplexer,
-    IOptions<DimChatOptions> options) : IDimChatRouteStore
+    IOptions<DimChatOptions> options) : IDimChatRouteStore, IDisposable
 {
     private const string connectMultiPlatformScript = """
         local connectionField = ARGV[1] .. "_c"
@@ -70,9 +70,12 @@ public sealed class DimRouteStore(
         """;
 
     private readonly IDatabase _database = connectionMultiplexer.GetDatabase();
+    private readonly IConnectionMultiplexer _connectionMultiplexer = connectionMultiplexer;
+    private readonly SemaphoreSlim _refreshScriptLoadLock = new(1, 1);
     private readonly bool _allowMultiDeviceLogin = options.Value.Connection.AllowMultiDeviceLogin;
 
     private readonly string _routeKeyPrefix = NormalizePrefix(options.Value.Connection.RouteKeyPrefix);
+    private byte[]? _refreshScriptHash;
 
     public async ValueTask<DimReplacedConnectionRoute[]?> SetRouteAsync(
         DimConectionRoute route,
@@ -174,13 +177,73 @@ public sealed class DimRouteStore(
         TimeSpan ttl,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(routes);
+
+        var routeArray = routes as DimConectionRoute[] ?? [.. routes];
+        if (routeArray.Length == 0)
+        {
+            return;
+        }
+
         var normalizedTtl = NormalizeTtl(ttl);
         var ttlSeconds = checked((long)normalizedTtl.TotalSeconds);
+
+        try
+        {
+            await RefreshTTLRoutesCoreAsync(routeArray, ttlSeconds, cancellationToken);
+        }
+        catch (RedisServerException exception) when (IsNoScript(exception))
+        {
+            await LoadRefreshScriptAsync(cancellationToken);
+            await RefreshTTLRoutesCoreAsync(routeArray, ttlSeconds, cancellationToken);
+        }
+    }
+
+    internal async Task LoadRefreshScriptAsync(CancellationToken cancellationToken)
+    {
+        await _refreshScriptLoadLock.WaitAsync(cancellationToken);
+
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var servers = GetWritableServers();
+            if (servers.Length == 0)
+            {
+                throw new InvalidOperationException("未找到可写 Redis 节点，无法预加载 Dim 路由刷新脚本。");
+            }
+
+            var tasks = servers
+                .Select(server => server.ScriptLoadAsync(refreshScript))
+                .ToArray();
+
+            var hashes = await Task.WhenAll(tasks);
+            _refreshScriptHash = hashes[0];
+        }
+        finally
+        {
+            _refreshScriptLoadLock.Release();
+        }
+    }
+
+    private async Task RefreshTTLRoutesCoreAsync(
+        DimConectionRoute[] routes,
+        long ttlSeconds,
+        CancellationToken cancellationToken)
+    {
+        var refreshScriptHash = _refreshScriptHash;
+        if (refreshScriptHash is null)
+        {
+            await LoadRefreshScriptAsync(cancellationToken);
+            refreshScriptHash = _refreshScriptHash;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
 
         var batch = _database.CreateBatch();
 
         var tasks = routes.Select(route => batch.ScriptEvaluateAsync(
-                refreshScript,
+                refreshScriptHash!,
                 [RouteKey(route)],
                 [
                     route.Platform.ToRouteValue(),
@@ -193,6 +256,71 @@ public sealed class DimRouteStore(
         batch.Execute();
 
         await Task.WhenAll(tasks);
+    }
+
+    private IServer[] GetWritableServers()
+    {
+        var servers = new List<IServer>();
+        var addedEndpoints = new HashSet<string>(StringComparer.Ordinal);
+
+        AddWritableServers(_connectionMultiplexer.GetServers(), servers, addedEndpoints);
+        AddWritableServers(configuredOnly: false, servers, addedEndpoints);
+        AddWritableServers(configuredOnly: true, servers, addedEndpoints);
+
+        return [.. servers];
+    }
+
+    private void AddWritableServers(
+        bool configuredOnly,
+        List<IServer> servers,
+        HashSet<string> addedEndpoints)
+    {
+        foreach (var endpoint in _connectionMultiplexer.GetEndPoints(configuredOnly))
+        {
+            IServer server;
+            try
+            {
+                server = _connectionMultiplexer.GetServer(endpoint);
+            }
+            catch (ArgumentException)
+            {
+                continue;
+            }
+
+            if (server.IsReplica)
+            {
+                continue;
+            }
+
+            if (addedEndpoints.Add(server.EndPoint.ToString() ?? string.Empty))
+            {
+                servers.Add(server);
+            }
+        }
+    }
+
+    private static void AddWritableServers(
+        IEnumerable<IServer> candidateServers,
+        List<IServer> servers,
+        HashSet<string> addedEndpoints)
+    {
+        foreach (var server in candidateServers)
+        {
+            if (server.IsReplica)
+            {
+                continue;
+            }
+
+            if (addedEndpoints.Add(server.EndPoint.ToString() ?? string.Empty))
+            {
+                servers.Add(server);
+            }
+        }
+    }
+
+    private static bool IsNoScript(RedisServerException exception)
+    {
+        return exception.Message.StartsWith("NOSCRIPT", StringComparison.OrdinalIgnoreCase);
     }
 
     private string RouteKey(DimConectionRoute route)
@@ -269,5 +397,10 @@ public sealed class DimRouteStore(
     private static TimeSpan NormalizeTtl(TimeSpan ttl)
     {
         return ttl > TimeSpan.Zero ? ttl : TimeSpan.FromDays(7);
+    }
+
+    public void Dispose()
+    {
+        _refreshScriptLoadLock.Dispose();
     }
 }
