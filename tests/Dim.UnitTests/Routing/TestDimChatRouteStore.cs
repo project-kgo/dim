@@ -131,6 +131,8 @@ internal sealed class TestLocalConnectionRouteStore : ILocalConnectionRouteStore
 {
     private readonly Dictionary<string, DimConectionRoute> _routes = new(StringComparer.Ordinal);
 
+    public int Count => _routes.Count;
+
     public void Add(DimConectionRoute route)
     {
         _routes[route.ConnectionId] = route;
@@ -149,5 +151,14 @@ internal sealed class TestLocalConnectionRouteStore : ILocalConnectionRouteStore
     public IReadOnlyCollection<DimConectionRoute> GetAll()
     {
         return [.. _routes.Values];
+    }
+
+    public IReadOnlyCollection<DimConectionRoute> GetRefreshBatch(int maxCount)
+    {
+        return [.. _routes.Values.Take(maxCount)];
+    }
+
+    public void MoveToTail(IReadOnlyCollection<DimConectionRoute> routes)
+    {
     }
 }
