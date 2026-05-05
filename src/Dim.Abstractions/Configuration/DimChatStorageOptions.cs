@@ -9,4 +9,8 @@ public sealed class DimChatStorageOptions
     public string? RedisConnectionString { get; set; }
 
     public string RedisStreamName { get; set; } = "dim:messages";
+
+    public string CapStorageSchema { get; set; } = "cap";
+
+    public string CapDefaultGroupName { get; set; } = "dim";
 }

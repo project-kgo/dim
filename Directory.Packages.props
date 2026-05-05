@@ -4,6 +4,9 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
+    <PackageVersion Include="DotNetCore.CAP" Version="10.0.1" />
+    <PackageVersion Include="DotNetCore.CAP.PostgreSql" Version="10.0.1" />
+    <PackageVersion Include="DotNetCore.CAP.RedisStreams" Version="10.0.1" />
     <PackageVersion Include="FluentAssertions" Version="8.9.0" />
     <PackageVersion Include="Google.Protobuf" Version="3.34.1" />
     <PackageVersion Include="Grpc.Tools" Version="2.80.0" />

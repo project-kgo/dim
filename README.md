@@ -53,6 +53,14 @@ public sealed class AppDimChatAuthenticator : IDimChatAuthenticator
 
 Redis 路由使用 `DimChat:Storage:RedisConnectionString` 配置，并通过 `Ku.Utils.Database.Redis.RedisConnectionFactory` 复用连接。未配置 Redis 时应用仍可启动，但 SignalR 连接会被拒绝。
 
+### CAP 消息队列
+
+框架内置集成 `DotNetCore.CAP`：传输使用 Redis Streams，存储使用 PostgreSQL。配置 `DimChat:Storage:PgMasterSqlConnectionString` 与 `DimChat:Storage:RedisConnectionString` 后会自动注册 CAP，业务代码可以直接注入 `ICapPublisher` 发布消息，并使用 `[CapSubscribe]` 订阅。
+
+- `DimChat:Storage:RedisStreamName`：作为 CAP Topic/Redis Stream 名称前缀，默认 `dim:messages`。
+- `DimChat:Storage:CapStorageSchema`：CAP PostgreSQL 表结构，默认 `cap`。
+- `DimChat:Storage:CapDefaultGroupName`：CAP 默认消费组，默认 `dim`。
+
 ## 本地开发
 
 ```bash

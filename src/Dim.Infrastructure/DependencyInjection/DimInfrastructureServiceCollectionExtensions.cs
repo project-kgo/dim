@@ -4,8 +4,10 @@ using Dim.Application.Signaling;
 using Dim.Infrastructure.Persistence;
 using Dim.Infrastructure.Routing;
 using Dim.Infrastructure.Signaling;
+using DotNetCore.CAP;
 using Ku.Utils.Database.Redis;
 using Ku.Utils.Database.PostgreSql;
+using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -17,6 +19,21 @@ namespace Dim.Infrastructure.DependencyInjection;
 
 public static class DimInfrastructureServiceCollectionExtensions
 {
+    public static IServiceCollection AddDimInfrastructure(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        var options = configuration
+            .GetSection(DimChatOptions.SectionName)
+            .Get<DimChatOptions>() ?? new DimChatOptions();
+
+        services.AddDimCap(options.Storage);
+        return services.AddDimInfrastructure();
+    }
+
     public static IServiceCollection AddDimInfrastructure(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
@@ -121,7 +138,53 @@ public static class DimInfrastructureServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(dimChatOptions);
 
         services.TryAddSingleton(dimChatOptions);
+        services.AddDimCap(dimChatOptions.Value.Storage);
         return services.AddDimInfrastructure();
+    }
+
+    private static IServiceCollection AddDimCap(
+        this IServiceCollection services,
+        DimChatStorageOptions storageOptions)
+    {
+        if (services.Any(static descriptor => descriptor.ServiceType == typeof(ICapPublisher)))
+        {
+            return services;
+        }
+
+        if (string.IsNullOrWhiteSpace(storageOptions.PgMasterSqlConnectionString) ||
+            string.IsNullOrWhiteSpace(storageOptions.RedisConnectionString))
+        {
+            return services;
+        }
+
+        var connectionString = storageOptions.PgMasterSqlConnectionString;
+        var redisConnectionString = storageOptions.RedisConnectionString;
+        var streamNamePrefix = NormalizeOptional(storageOptions.RedisStreamName);
+        var capSchema = NormalizeOptional(storageOptions.CapStorageSchema) ?? "cap";
+        var defaultGroupName = NormalizeOptional(storageOptions.CapDefaultGroupName) ?? "dim";
+
+        services.AddCap(options =>
+        {
+            options.DefaultGroupName = defaultGroupName;
+            options.UseStorageLock = true;
+            options.EnablePublishParallelSend = true;
+
+            if (streamNamePrefix is not null)
+            {
+                options.TopicNamePrefix = streamNamePrefix;
+            }
+
+            options.UsePostgreSql(postgreSqlOptions =>
+            {
+                postgreSqlOptions.ConnectionString = connectionString;
+                // postgreSqlOptions.DataSource = sp.GetRequiredService<DimMasterDataSource>().Value;
+                postgreSqlOptions.Schema = capSchema;
+            });
+
+            options.UseRedis(redisConnectionString);
+        });
+
+        return services;
     }
 
     private static string GetRequiredConnectionString(string? connectionString, string configurationKey)
@@ -132,5 +195,10 @@ public static class DimInfrastructureServiceCollectionExtensions
         }
 
         throw new InvalidOperationException($"{configurationKey} 未配置。");
+    }
+
+    private static string? NormalizeOptional(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 }

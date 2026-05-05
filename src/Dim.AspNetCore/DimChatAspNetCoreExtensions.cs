@@ -43,12 +43,11 @@ public static class DimChatAspNetCoreExtensions
         services.TryAddSingleton<DimServerIdentity>();
         services.TryAddSingleton<DimChatRouteService>();
         services.TryAddSingleton<IDimSignalSender, DimSignalSender>();
-        services.AddDimInfrastructure();
+        services.AddDimInfrastructure(configuration);
         services.TryAddSingleton<IUserIdProvider, DimAuthenticationUserIdProvider>();
         services.TryAddSingleton<IDimTokenValidator, DefaultDimTokenValidator>();
         services.TryAddSingleton<IDimLocalSignalDispatcher, DimSignalHubDispatcher>();
         services.AddSignalR();
-
 
         services.TryAddSingleton<DistributedSnowflake>(sp =>
         {
