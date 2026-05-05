@@ -34,17 +34,17 @@ app.Run();
 
 ### SignalR 接入鉴权
 
-业务项目需要实现并注册 `IDimChatAuthenticator`，鉴权成功后返回 `uid` 和客户端平台：
+业务项目可以实现并注册 `IDimTokenValidator`，鉴权成功后返回 `uid` 和客户端平台：
 
 ```csharp
-public sealed class AppDimChatAuthenticator : IDimChatAuthenticator
+public sealed class AppDimTokenValidator : IDimTokenValidator
 {
-    public ValueTask<DimChatAuthenticationResult?> AuthenticateAsync(
-        DimChatAuthenticationContext context,
+    public Task<AuthenticationResult?> ValidateAsync(
+        string token,
         CancellationToken cancellationToken)
     {
-        return ValueTask.FromResult<DimChatAuthenticationResult?>(
-            new DimChatAuthenticationResult("user-id", DimClientPlatform.Web));
+        return Task.FromResult<AuthenticationResult?>(
+            new AuthenticationResult("user-id", DimClientPlatform.Web));
     }
 }
 ```

@@ -1,6 +1,8 @@
 using Dim.Abstractions.Configuration;
 using Dim.Abstractions.Routing;
+using Dim.Application.Authentication;
 using Dim.Application.Signaling;
+using Dim.Infrastructure.Authentication;
 using Dim.Infrastructure.Persistence;
 using Dim.Infrastructure.Routing;
 using Dim.Infrastructure.Signaling;
@@ -108,6 +110,7 @@ public static class DimInfrastructureServiceCollectionExtensions
         });
 
         services.TryAddSingleton<IDimChatRouteStore, DimRouteStore>();
+        services.TryAddSingleton<ITokenValidatorStore, RedisTokenValidatorStore>();
 
         services.TryAddSingleton<IDimSignalBus>(serviceProvider =>
         {

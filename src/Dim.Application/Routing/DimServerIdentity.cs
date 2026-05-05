@@ -4,7 +4,17 @@ using System.Globalization;
 namespace Dim.Application.Routing;
 
 
-public sealed class DimServerIdentity(DistributedSnowflake snowflake)
+public sealed class DimServerIdentity
 {
-    public string ServerId { get; } = snowflake.Generate().ToString(CultureInfo.InvariantCulture);
+    public DimServerIdentity()
+    {
+        ServerId = Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture);
+    }
+
+    public DimServerIdentity(DistributedSnowflake snowflake)
+    {
+        ServerId = snowflake.Generate().ToString(CultureInfo.InvariantCulture);
+    }
+
+    public string ServerId { get; }
 }

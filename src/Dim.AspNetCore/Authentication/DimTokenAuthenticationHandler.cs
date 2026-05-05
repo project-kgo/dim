@@ -11,9 +11,9 @@ public sealed class DimTokenAuthenticationHandler(
     IOptionsMonitor<AuthenticationSchemeOptions> options,
     ILoggerFactory logger,
     UrlEncoder encoder,
-    IDimTokenValidator tokenValidator) : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
+    ITokenValidator tokenValidator) : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
 {
-    private readonly IDimTokenValidator _tokenValidator = tokenValidator;
+    private readonly ITokenValidator _tokenValidator = tokenValidator;
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
@@ -22,7 +22,6 @@ public sealed class DimTokenAuthenticationHandler(
         {
             return AuthenticateResult.NoResult();
         }
-        Logger.LogDebug("Token: {Token}", token);
 
         var result = await _tokenValidator.ValidateAsync(token, Context.RequestAborted);
         if (result == null)

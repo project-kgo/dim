@@ -1,13 +1,12 @@
-
+using Dim.Abstractions.Authentication;
 using Dim.Abstractions.Routing;
-using Dim.AspNetCore.Authentication;
 
 namespace Dim.SampleHost.Authentication;
 
-public class TokenVerify : IDimTokenValidator
+public class TokenVerify : ITokenValidator
 {
-    public Task<DimChatAuthenticationResult?> ValidateAsync(string token, CancellationToken cancellationToken)
+    public Task<AuthenticationResult?> ValidateAsync(string token, CancellationToken cancellationToken)
     {
-        return Task.FromResult<DimChatAuthenticationResult?>(new DimChatAuthenticationResult("1000", DimClientPlatform.Android));
+        return Task.FromResult<AuthenticationResult?>(new AuthenticationResult("1000", DimClientPlatform.Android));
     }
 }

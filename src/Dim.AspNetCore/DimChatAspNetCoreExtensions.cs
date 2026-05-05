@@ -2,6 +2,7 @@ using Dim.Abstractions.Authentication;
 using Dim.Abstractions.Configuration;
 using Dim.Abstractions.Runtime;
 using Dim.Abstractions.Signaling;
+using Dim.Application.Authentication;
 using Dim.Application.Runtime;
 using Dim.Application.Routing;
 using Dim.Application.Signaling;
@@ -45,7 +46,11 @@ public static class DimChatAspNetCoreExtensions
         services.TryAddSingleton<IDimSignalSender, DimSignalSender>();
         services.AddDimInfrastructure(configuration);
         services.TryAddSingleton<IUserIdProvider, DimAuthenticationUserIdProvider>();
-        services.TryAddSingleton<IDimTokenValidator, DefaultDimTokenValidator>();
+        services.TryAddSingleton<DImAuthentication>();
+        services.TryAddSingleton<IAuthentication>(serviceProvider =>
+            serviceProvider.GetRequiredService<DImAuthentication>());
+        services.TryAddSingleton<ITokenValidator>(serviceProvider =>
+            serviceProvider.GetRequiredService<DImAuthentication>());
         services.TryAddSingleton<IDimLocalSignalDispatcher, DimSignalHubDispatcher>();
         services.AddSignalR();
 

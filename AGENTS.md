@@ -13,7 +13,7 @@ description: 项目规范 (Project Rules)
 - 如果能抽象出来一个工具或者组件的，就抽象出来一个工具或者组件。
 - 严禁写出代码屎山，即代码重复、逻辑复杂、可维护性差的代码。
 - 不用过度设计， 大道至简。
-- 主动性能优化， 避免资源浪费。
+- 主动性能优化， 避免资源浪费， 能零拷贝零分配的则优先使用。
 
 ## 项目介绍
 
@@ -23,7 +23,8 @@ description: 项目规范 (Project Rules)
 
 - **语言**: .net 10
 - **框架**: ASP.NET Core Minimal APIs , SignalR websocket, protobuf
-- **日志框架**: Serilog
+- **日志框架**: Serilog， 并默认使用 Console 输出
+- **日志格式**: JSON 格式
 - **数据库**: Entity Framework Core (PostgreSQL)
 - **缓存**: Redis (StackExchange.Redis)
 - **消息队列**: Redis Stream
@@ -37,3 +38,4 @@ description: 项目规范 (Project Rules)
 - **注释**: 中文注释
 - **代码质量**: 遵循 .net 10 代码质量规范， 遵循官方最佳实践。
 - **代码性能**: 注重性能，能零拷贝零分配的则优先使用
+- **时间**: 所有时间都使用 DateTimeOffset 类型, 并默认使用 UTC 时间
