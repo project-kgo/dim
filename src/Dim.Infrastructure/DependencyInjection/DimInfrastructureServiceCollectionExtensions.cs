@@ -12,8 +12,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
-using Npgsql;
 using StackExchange.Redis;
+using DotNetCore.CAP.Internal;
+using Dim.Infrastructure.Snowflake;
 
 namespace Dim.Infrastructure.DependencyInjection;
 
@@ -183,6 +184,8 @@ public static class DimInfrastructureServiceCollectionExtensions
 
             options.UseRedis(redisConnectionString);
         });
+
+        services.AddSingleton<ISnowflakeId, SnowflakeCap>();
 
         return services;
     }
