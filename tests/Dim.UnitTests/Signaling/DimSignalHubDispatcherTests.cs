@@ -12,6 +12,8 @@ namespace Dim.UnitTests.Signaling;
 
 public sealed class DimSignalHubDispatcherTests
 {
+    private const long AppId = 1001;
+
     [Fact]
     public async Task DispatchAsyncShouldSendUsersSignalToUserClients()
     {
@@ -28,7 +30,7 @@ public sealed class DimSignalHubDispatcherTests
         await dispatcher.DispatchAsync(signalMessage, CancellationToken.None);
 
         var message = clients.Messages.Should().ContainSingle().Subject;
-        message.Target.Should().Be("users:u1,u2");
+        message.Target.Should().Be("users:1001:u1,1001:u2");
         message.Method.Should().Be("ReceiveSignal");
         SignalEnvelope.Parser.ParseFrom(message.GetPayload()).SignalType.Should().Be("chat.message");
     }
@@ -43,8 +45,34 @@ public sealed class DimSignalHubDispatcherTests
         await dispatcher.DispatchAsync(signalMessage, CancellationToken.None);
 
         var message = clients.Messages.Should().ContainSingle().Subject;
-        message.Target.Should().Be("all");
+        message.Target.Should().Be("group:dim:app:1001");
         SignalEnvelope.Parser.ParseFrom(message.GetPayload()).SignalType.Should().Be("chat.message");
+    }
+
+    [Fact]
+    public async Task DispatchAsyncWhenUsersTargetAppIdIsMissingShouldThrow()
+    {
+        var dispatcher = CreateDispatcher(new RecordingHubClients());
+        var signalMessage = CreateMessage(new SignalTarget
+        {
+            Users = new SignalUserTarget
+            {
+                UserIds = { "u1" }
+            }
+        }, appId: 0);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await dispatcher.DispatchAsync(signalMessage, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task DispatchAsyncWhenAllTargetAppIdIsMissingShouldThrow()
+    {
+        var dispatcher = CreateDispatcher(new RecordingHubClients());
+        var signalMessage = CreateMessage(new SignalTarget { All = true }, appId: 0);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await dispatcher.DispatchAsync(signalMessage, CancellationToken.None));
     }
 
     [Fact]
@@ -98,8 +126,10 @@ public sealed class DimSignalHubDispatcherTests
             Options.Create(new DimChatOptions()));
     }
 
-    private static SignalMessage CreateMessage(SignalTarget target)
+    private static SignalMessage CreateMessage(SignalTarget target, long appId = AppId)
     {
+        target.AppId = appId;
+
         return new SignalMessage
         {
             Target = target,

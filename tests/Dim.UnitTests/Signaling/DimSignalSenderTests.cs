@@ -7,20 +7,23 @@ namespace Dim.UnitTests.Signaling;
 
 public sealed class DimSignalSenderTests
 {
+    private const long AppId = 1001;
+
     [Fact]
     public async Task SendToUsersAsyncShouldPublishUsersSignalEnvelope()
     {
         var bus = new RecordingSignalBus();
         var routeStore = new RecordingRouteStore(
         [
-            new DimUserConnectionRoute("u1", DimClientPlatform.Web, "c1", "s1"),
-            new DimUserConnectionRoute("u2", DimClientPlatform.Ios, "c2", "s2"),
-            new DimUserConnectionRoute("u2", DimClientPlatform.Web, "c3", "s2")
+            new DimUserConnectionRoute(AppId, "u1", DimClientPlatform.Web, "c1", "s1"),
+            new DimUserConnectionRoute(AppId, "u2", DimClientPlatform.Ios, "c2", "s2"),
+            new DimUserConnectionRoute(AppId, "u2", DimClientPlatform.Web, "c3", "s2"),
+            new DimUserConnectionRoute(2002, "u1", DimClientPlatform.Web, "other", "s1")
         ]);
         var sender = new DimSignalSender(bus, routeStore);
         byte[] payload = [1, 2, 3];
 
-        await sender.SendToUsersAsync(["u1", "u2", "u1"], "chat.message", payload);
+        await sender.SendToUsersAsync(AppId, ["u1", "u2", "u1"], "chat.message", payload);
 
         bus.GlobalMessages.Should().BeEmpty();
         bus.ServerMessages.Should().HaveCount(2);
@@ -28,6 +31,7 @@ public sealed class DimSignalSenderTests
         var s1 = bus.ServerMessages.Should().ContainSingle(message => message.ServerId == "s1").Subject.Message;
         var s1Message = SignalMessage.Parser.ParseFrom(s1);
         s1Message.Target.TargetCase.Should().Be(SignalTarget.TargetOneofCase.Connections);
+        s1Message.Target.AppId.Should().Be(AppId);
         s1Message.Target.Connections.ConnectionIds.Should().Equal("c1");
         s1Message.Envelope.SignalType.Should().Be("chat.message");
         s1Message.Envelope.Payload.ToByteArray().Should().Equal(payload);
@@ -47,12 +51,13 @@ public sealed class DimSignalSenderTests
 
         byte[] payload = [1, 2];
 
-        await sender.SendToConnectionAsync("s1", "c1", "chat.message", payload);
+        await sender.SendToConnectionAsync(AppId, "s1", "c1", "chat.message", payload);
 
         var message = bus.ServerMessages.Should().ContainSingle().Subject;
         message.ServerId.Should().Be("s1");
 
         var envelope = SignalMessage.Parser.ParseFrom(message.Message);
+        envelope.Target.AppId.Should().Be(AppId);
         envelope.Target.Connections.ConnectionIds.Should().Equal("c1");
         envelope.Envelope.Payload.ToByteArray().Should().Equal([1, 2]);
     }
@@ -63,11 +68,12 @@ public sealed class DimSignalSenderTests
         var bus = new RecordingSignalBus();
         var sender = new DimSignalSender(bus, new RecordingRouteStore([]));
 
-        await sender.BroadcastAsync("system.notice", ReadOnlyMemory<byte>.Empty);
+        await sender.BroadcastAsync(AppId, "system.notice", ReadOnlyMemory<byte>.Empty);
 
         bus.ServerMessages.Should().BeEmpty();
         var envelope = SignalMessage.Parser.ParseFrom(bus.GlobalMessages.Should().ContainSingle().Subject);
         envelope.Target.TargetCase.Should().Be(SignalTarget.TargetOneofCase.All);
+        envelope.Target.AppId.Should().Be(AppId);
         envelope.Target.All.Should().BeTrue();
     }
 
@@ -77,19 +83,22 @@ public sealed class DimSignalSenderTests
         var sender = new DimSignalSender(new RecordingSignalBus(), new RecordingRouteStore([]));
 
         await Assert.ThrowsAsync<ArgumentException>(async () =>
-            await sender.SendToUsersAsync([], "chat.message", ReadOnlyMemory<byte>.Empty));
+            await sender.SendToUsersAsync(AppId, [], "chat.message", ReadOnlyMemory<byte>.Empty));
 
         await Assert.ThrowsAsync<ArgumentException>(async () =>
-            await sender.SendToUsersAsync(["u1", ""], "chat.message", ReadOnlyMemory<byte>.Empty));
+            await sender.SendToUsersAsync(AppId, ["u1", ""], "chat.message", ReadOnlyMemory<byte>.Empty));
 
         await Assert.ThrowsAsync<ArgumentException>(async () =>
-            await sender.SendToConnectionAsync("", "c1", "chat.message", ReadOnlyMemory<byte>.Empty));
+            await sender.SendToConnectionAsync(AppId, "", "c1", "chat.message", ReadOnlyMemory<byte>.Empty));
 
         await Assert.ThrowsAsync<ArgumentException>(async () =>
-            await sender.SendToConnectionAsync("s1", "", "chat.message", ReadOnlyMemory<byte>.Empty));
+            await sender.SendToConnectionAsync(AppId, "s1", "", "chat.message", ReadOnlyMemory<byte>.Empty));
 
         await Assert.ThrowsAsync<ArgumentException>(async () =>
-            await sender.BroadcastAsync("", ReadOnlyMemory<byte>.Empty));
+            await sender.BroadcastAsync(AppId, "", ReadOnlyMemory<byte>.Empty));
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () =>
+            await sender.BroadcastAsync(0, "chat.message", ReadOnlyMemory<byte>.Empty));
     }
 
     private sealed class RecordingSignalBus : IDimSignalBus
@@ -139,11 +148,12 @@ public sealed class DimSignalSenderTests
         }
 
         public ValueTask<IReadOnlyCollection<DimUserConnectionRoute>> GetRoutesAsync(
+            long appId,
             IReadOnlyCollection<string> userIds,
             CancellationToken cancellationToken)
         {
             var values = routes
-                .Where(route => userIds.Contains(route.UserId, StringComparer.Ordinal))
+                .Where(route => route.AppId == appId && userIds.Contains(route.UserId, StringComparer.Ordinal))
                 .ToArray();
 
             return ValueTask.FromResult<IReadOnlyCollection<DimUserConnectionRoute>>(values);

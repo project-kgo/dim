@@ -16,14 +16,14 @@ public sealed class RedisTokenValidatorStoreTests
 
         var tokenInfo = RedisTokenValidatorStore.ParseAccessTokenInfo(
             [
-                new HashEntry("loginId", "u1:Web"),
+                new HashEntry("loginId", "1001:u1:Web"),
                 new HashEntry("accessToken", "token"),
                 new HashEntry("expiresAt", expiresAt),
                 new HashEntry("ttl", (long)ttl.TotalMilliseconds)
             ]);
 
         tokenInfo.Should().Be(new AccessTokenInfo(
-            new LoginId("u1:Web"),
+            new LoginId("1001:u1:Web"),
             "token",
             DateTimeOffset.FromUnixTimeMilliseconds(expiresAt),
             ttl));

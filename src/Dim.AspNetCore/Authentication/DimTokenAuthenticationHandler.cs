@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Globalization;
 using System.Text.Encodings.Web;
 using Dim.Abstractions.Authentication;
 using Microsoft.AspNetCore.Authentication;
@@ -31,6 +32,7 @@ public sealed class DimTokenAuthenticationHandler(
 
         var claims = new List<Claim>
         {
+            new(AuthConstants.AppIdClaim, result.AppId.ToString(CultureInfo.InvariantCulture)),
             new(AuthConstants.UserIdClaim, result.UserId),
             new(AuthConstants.PlatformClaim, result.Platform.ToString()),
         };

@@ -31,6 +31,8 @@ message SignalConnectionTarget {
 }
 
 message SignalTarget {
+  int64 app_id = 4;
+
   oneof target {
     SignalUserTarget users = 1;
     bool all = 2;

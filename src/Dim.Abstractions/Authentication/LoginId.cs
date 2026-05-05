@@ -5,8 +5,8 @@ namespace Dim.Abstractions.Authentication;
 
 public readonly record struct LoginId(string Value)
 {
-    public LoginId(string userId, DimClientPlatform platform)
-        : this($"{userId}:{platform}")
+    public LoginId(long appId, string userId, DimClientPlatform platform)
+        : this($"{appId}:{userId}:{platform}")
     {
     }
 

@@ -13,17 +13,24 @@ public sealed class DimChatRouteService(
     private readonly DimServerIdentity _serverIdentity = serverIdentity;
 
     public async ValueTask<DimChatRouteConnectResult> ConnectAsync(
+        long appId,
         string userId,
         DimClientPlatform platform,
         string connectionId,
         DimChatConnectionOptions options,
         CancellationToken cancellationToken)
     {
+        if (appId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(appId), "AppId 必须大于 0。");
+        }
+
         ArgumentException.ThrowIfNullOrWhiteSpace(userId);
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionId);
         ArgumentNullException.ThrowIfNull(options);
 
         var currentRoute = new DimConectionRoute(
+            appId,
             userId,
             platform,
             connectionId,

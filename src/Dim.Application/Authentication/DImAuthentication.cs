@@ -148,20 +148,34 @@ public sealed class DImAuthentication(ITokenValidatorStore tokenValidatorStore) 
         result = null;
 
         var loginIdValue = loginId.Value;
-        var separatorIndex = loginIdValue.LastIndexOf(':');
-        if (separatorIndex <= 0 || separatorIndex == loginIdValue.Length - 1)
+        var firstSeparatorIndex = loginIdValue.IndexOf(':', StringComparison.Ordinal);
+        var lastSeparatorIndex = loginIdValue.LastIndexOf(':');
+        if (firstSeparatorIndex <= 0
+            || lastSeparatorIndex <= firstSeparatorIndex
+            || lastSeparatorIndex == loginIdValue.Length - 1)
         {
             return false;
         }
 
-        var userId = loginIdValue[..separatorIndex];
-        var platformValue = loginIdValue[(separatorIndex + 1)..];
-        if (!DimClientPlatformParser.TryParse(platformValue, out var platform))
+        if (!long.TryParse(
+                loginIdValue[..firstSeparatorIndex],
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out var appId))
         {
             return false;
         }
 
-        result = new AuthenticationResult(userId, platform);
+        var userId = loginIdValue[(firstSeparatorIndex + 1)..lastSeparatorIndex];
+        var platformValue = loginIdValue[(lastSeparatorIndex + 1)..];
+        if (appId <= 0
+            || string.IsNullOrWhiteSpace(userId)
+            || !DimClientPlatformParser.TryParse(platformValue, out var platform))
+        {
+            return false;
+        }
+
+        result = new AuthenticationResult(appId, userId, platform);
         return true;
     }
 

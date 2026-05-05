@@ -2,6 +2,7 @@ using Dim.Abstractions.Configuration;
 using Dim.Abstractions.Routing;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
+using System.Globalization;
 
 namespace Dim.Infrastructure.Routing;
 
@@ -100,10 +101,11 @@ public sealed class DimRouteStore(
             return null;
         }
 
-        return ParseReplacedRoutes(list);
+        return ParseReplacedRoutes(route.AppId, list);
     }
 
     public async ValueTask<IReadOnlyCollection<DimUserConnectionRoute>> GetRoutesAsync(
+        long appId,
         IReadOnlyCollection<string> userIds,
         CancellationToken cancellationToken)
     {
@@ -127,7 +129,7 @@ public sealed class DimRouteStore(
 
         var batch = _database.CreateBatch();
         var tasks = normalizedUserIds
-            .Select(userId => batch.HashGetAllAsync(RouteKey(userId)))
+            .Select(userId => batch.HashGetAllAsync(RouteKey(appId, userId)))
             .ToArray();
 
         batch.Execute();
@@ -137,7 +139,7 @@ public sealed class DimRouteStore(
         var routes = new List<DimUserConnectionRoute>(normalizedUserIds.Length);
         for (var i = 0; i < normalizedUserIds.Length; i++)
         {
-            AddUserRoutes(normalizedUserIds[i], tasks[i].Result, routes);
+            AddUserRoutes(appId, normalizedUserIds[i], tasks[i].Result, routes);
         }
 
         return routes;
@@ -325,15 +327,20 @@ public sealed class DimRouteStore(
 
     private string RouteKey(DimConectionRoute route)
     {
-        return RouteKey(route.UserId);
+        return RouteKey(route.AppId, route.UserId);
     }
 
-    private string RouteKey(string userId)
+    private string RouteKey(long appId, string userId)
     {
-        return $"{_routeKeyPrefix}:{{{userId}}}";
+        return BuildRouteKey(_routeKeyPrefix, appId, userId);
     }
 
-    private static DimReplacedConnectionRoute[] ParseReplacedRoutes(RedisResult[] list)
+    internal static string BuildRouteKey(string routeKeyPrefix, long appId, string userId)
+    {
+        return $"{NormalizePrefix(routeKeyPrefix)}:{{{appId.ToString(CultureInfo.InvariantCulture)}:{userId}}}";
+    }
+
+    private static DimReplacedConnectionRoute[] ParseReplacedRoutes(long appId, RedisResult[] list)
     {
         var routes = new List<DimReplacedConnectionRoute>(list.Length / 3);
         for (var i = 0; i + 2 < list.Length; i += 3)
@@ -346,7 +353,7 @@ public sealed class DimRouteStore(
                 && !string.IsNullOrWhiteSpace(connectionId)
                 && !string.IsNullOrWhiteSpace(serverId))
             {
-                routes.Add(new DimReplacedConnectionRoute(platform, connectionId!, serverId!));
+                routes.Add(new DimReplacedConnectionRoute(appId, platform, connectionId!, serverId!));
             }
         }
 
@@ -354,6 +361,7 @@ public sealed class DimRouteStore(
     }
 
     private static void AddUserRoutes(
+        long appId,
         string userId,
         HashEntry[] entries,
         List<DimUserConnectionRoute> routes)
@@ -384,7 +392,7 @@ public sealed class DimRouteStore(
                 continue;
             }
 
-            routes.Add(new DimUserConnectionRoute(userId, platform, connectionId, serverId));
+            routes.Add(new DimUserConnectionRoute(appId, userId, platform, connectionId, serverId));
         }
     }
 

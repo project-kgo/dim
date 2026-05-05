@@ -13,14 +13,16 @@ public sealed class DimSignalSender(
     private readonly IDimChatRouteStore _routeStore = routeStore;
 
     public async ValueTask SendToUsersAsync(
+        long appId,
         IReadOnlyCollection<string> userIds,
         string signalType,
         ReadOnlyMemory<byte> payload,
         CancellationToken cancellationToken = default)
     {
+        ThrowIfInvalidAppId(appId);
         var normalizedUserIds = NormalizeUserIds(userIds);
         var envelope = CreateSignalEnvelope(signalType, payload);
-        var routes = await _routeStore.GetRoutesAsync(normalizedUserIds, cancellationToken);
+        var routes = await _routeStore.GetRoutesAsync(appId, normalizedUserIds, cancellationToken);
 
         foreach (var group in routes.GroupBy(route => route.ServerId, StringComparer.Ordinal))
         {
@@ -39,6 +41,7 @@ public sealed class DimSignalSender(
                 envelope,
                 new SignalTarget
                 {
+                    AppId = appId,
                     Connections = new SignalConnectionTarget
                     {
                         ConnectionIds = { connectionIds }
@@ -49,12 +52,14 @@ public sealed class DimSignalSender(
     }
 
     public ValueTask SendToConnectionAsync(
+        long appId,
         string serverId,
         string connectionId,
         string signalType,
         ReadOnlyMemory<byte> payload,
         CancellationToken cancellationToken = default)
     {
+        ThrowIfInvalidAppId(appId);
         ArgumentException.ThrowIfNullOrWhiteSpace(serverId);
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionId);
 
@@ -64,6 +69,7 @@ public sealed class DimSignalSender(
             envelope,
             new SignalTarget
             {
+                AppId = appId,
                 Connections = new SignalConnectionTarget
                 {
                     ConnectionIds = { connectionId.Trim() }
@@ -73,15 +79,17 @@ public sealed class DimSignalSender(
     }
 
     public ValueTask BroadcastAsync(
+        long appId,
         string signalType,
         ReadOnlyMemory<byte> payload,
         CancellationToken cancellationToken = default)
     {
+        ThrowIfInvalidAppId(appId);
         ArgumentException.ThrowIfNullOrWhiteSpace(signalType);
 
         var signalMessage = CreateSignalMessage(
             CreateSignalEnvelope(signalType, payload),
-            new SignalTarget { All = true });
+            new SignalTarget { AppId = appId, All = true });
         return _signalBus.PublishAsync(signalMessage.ToByteArray(), cancellationToken);
     }
 
@@ -145,5 +153,13 @@ public sealed class DimSignalSender(
         }
 
         return normalizedUserIds;
+    }
+
+    private static void ThrowIfInvalidAppId(long appId)
+    {
+        if (appId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(appId), "AppId 必须大于 0。");
+        }
     }
 }

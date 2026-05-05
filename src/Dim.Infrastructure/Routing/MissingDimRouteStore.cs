@@ -10,6 +10,7 @@ public class MissingDimRouteStore : IDimChatRouteStore
     }
 
     public ValueTask<IReadOnlyCollection<DimUserConnectionRoute>> GetRoutesAsync(
+        long appId,
         IReadOnlyCollection<string> userIds,
         CancellationToken cancellationToken)
     {

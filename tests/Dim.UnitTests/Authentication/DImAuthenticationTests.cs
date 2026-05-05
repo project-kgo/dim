@@ -9,12 +9,14 @@ namespace Dim.UnitTests.Authentication;
 
 public sealed class DImAuthenticationTests
 {
+    private const long AppId = 1001;
+
     [Fact]
     public async Task GenerateAccessTokenAsyncShouldStoreTokenWithLoginIdPrefix()
     {
         var store = new TestTokenValidatorStore();
         var authentication = new DImAuthentication(store);
-        var loginId = new LoginId("u1", DimClientPlatform.Web);
+        var loginId = new LoginId(AppId, "u1", DimClientPlatform.Web);
         var ttl = TimeSpan.FromMinutes(30);
         var before = DateTimeOffset.UtcNow;
 
@@ -38,7 +40,7 @@ public sealed class DImAuthenticationTests
     {
         var store = new TestTokenValidatorStore();
         var authentication = new DImAuthentication(store);
-        var loginId = new LoginId("u1", DimClientPlatform.Android);
+        var loginId = new LoginId(AppId, "u1", DimClientPlatform.Android);
         var tokenInfo = await authentication.GenerateAccessTokenAsync(loginId, TimeSpan.FromMinutes(30));
 
         var isValid = await authentication.ValidateAccessTokenAsync(loginId, tokenInfo.AccessToken);
@@ -51,7 +53,7 @@ public sealed class DImAuthenticationTests
     {
         var store = new TestTokenValidatorStore();
         var authentication = new DImAuthentication(store);
-        var loginId = new LoginId("u1", DimClientPlatform.Ios);
+        var loginId = new LoginId(AppId, "u1", DimClientPlatform.Ios);
         await authentication.GenerateAccessTokenAsync(loginId, TimeSpan.FromMinutes(30));
 
         var isValid = await authentication.ValidateAccessTokenAsync(loginId, "bad-token");
@@ -64,7 +66,7 @@ public sealed class DImAuthenticationTests
     {
         var store = new TestTokenValidatorStore();
         var authentication = new DImAuthentication(store);
-        var loginId = new LoginId("u1", DimClientPlatform.Web);
+        var loginId = new LoginId(AppId, "u1", DimClientPlatform.Web);
         store.AccessTokens[loginId.Value] = new AccessTokenInfo(
             loginId,
             "token",
@@ -81,12 +83,12 @@ public sealed class DImAuthenticationTests
     {
         var store = new TestTokenValidatorStore();
         var authentication = new DImAuthentication(store);
-        var loginId = new LoginId("u1", DimClientPlatform.Android);
+        var loginId = new LoginId(AppId, "u1", DimClientPlatform.Android);
         var tokenInfo = await authentication.GenerateAccessTokenAsync(loginId, TimeSpan.FromMinutes(30));
 
         var result = await authentication.ValidateAsync(tokenInfo.AccessToken, CancellationToken.None);
 
-        result.Should().Be(new AuthenticationResult("u1", DimClientPlatform.Android));
+        result.Should().Be(new AuthenticationResult(AppId, "u1", DimClientPlatform.Android));
     }
 
     [Fact]
@@ -94,7 +96,7 @@ public sealed class DImAuthenticationTests
     {
         var store = new TestTokenValidatorStore();
         var authentication = new DImAuthentication(store);
-        var loginId = new LoginId("u1", DimClientPlatform.Web);
+        var loginId = new LoginId(AppId, "u1", DimClientPlatform.Web);
         var expiresAt = DateTimeOffset.UtcNow.AddHours(1);
         var ttl = TimeSpan.FromHours(1);
 
@@ -112,7 +114,7 @@ public sealed class DImAuthenticationTests
     {
         var store = new TestTokenValidatorStore();
         var authentication = new DImAuthentication(store);
-        var loginId = new LoginId("u1", DimClientPlatform.Web);
+        var loginId = new LoginId(AppId, "u1", DimClientPlatform.Web);
         var ttl = TimeSpan.FromDays(7);
         store.AccessTokens[loginId.Value] = new AccessTokenInfo(
             loginId,
@@ -133,7 +135,7 @@ public sealed class DImAuthenticationTests
     {
         var store = new TestTokenValidatorStore();
         var authentication = new DImAuthentication(store);
-        var loginId = new LoginId("u1", DimClientPlatform.Web);
+        var loginId = new LoginId(AppId, "u1", DimClientPlatform.Web);
         store.AccessTokens[loginId.Value] = new AccessTokenInfo(
             loginId,
             "token",
@@ -151,7 +153,7 @@ public sealed class DImAuthenticationTests
     {
         var store = new TestTokenValidatorStore();
         var authentication = new DImAuthentication(store);
-        var loginId = new LoginId("u1", DimClientPlatform.Web);
+        var loginId = new LoginId(AppId, "u1", DimClientPlatform.Web);
         store.AccessTokens[loginId.Value] = new AccessTokenInfo(
             loginId,
             "token",

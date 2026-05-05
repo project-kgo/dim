@@ -5,12 +5,12 @@ using System.Text.Json.Nodes;
 
 namespace Dim.IntegrationTests.Hosting;
 
-public sealed class DimSampleHostTests
+public sealed class DimSampleHostTests(WebApplicationFactory<Program> factory)
+    : IClassFixture<WebApplicationFactory<Program>>
 {
     [Fact]
     public async Task HealthEndpointShouldReturnOk()
     {
-        await using var factory = new WebApplicationFactory<Program>();
         using var client = factory.CreateClient();
 
         using var response = await client.GetAsync("/dim/health");
@@ -21,7 +21,6 @@ public sealed class DimSampleHostTests
     [Fact]
     public async Task HubNegotiateShouldOnlyExposeWebSocketsTransport()
     {
-        await using var factory = new WebApplicationFactory<Program>();
         using var client = factory.CreateClient();
 
         using var response = await client.PostAsync(

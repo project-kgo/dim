@@ -4,9 +4,11 @@ using Dim.Abstractions.Routing;
 using Dim.Abstractions.Signaling;
 using Dim.Application.Routing;
 using Dim.Application.Signaling;
+using Dim.AspNetCore.Signaling;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Globalization;
 using System.Text;
 
 namespace Dim.AspNetCore.Hubs;
@@ -32,7 +34,7 @@ public sealed class DimChatHub(
 
     public override async Task OnConnectedAsync()
     {
-        if (!TryGetAuthenticatedUser(out var userId, out var platform))
+        if (!TryGetAuthenticatedUser(out var appId, out var userId, out var platform))
         {
             Context.Abort();
             return;
@@ -41,10 +43,16 @@ public sealed class DimChatHub(
         try
         {
             var routeResult = await _routeService.ConnectAsync(
+                appId,
                 userId,
                 platform,
                 Context.ConnectionId,
                 _connectionOptions,
+                Context.ConnectionAborted);
+
+            await Groups.AddToGroupAsync(
+                Context.ConnectionId,
+                DimSignalTargetNames.AppGroup(appId),
                 Context.ConnectionAborted);
 
             await SendForceOfflineAsync(routeResult.ReplacedRoutes, Context.ConnectionAborted);
@@ -60,13 +68,17 @@ public sealed class DimChatHub(
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        if (!TryGetAuthenticatedUser(out _, out _))
+        if (!TryGetAuthenticatedUser(out var appId, out _, out _))
         {
             Context.Abort();
             return;
         }
         try
         {
+            await Groups.RemoveFromGroupAsync(
+                Context.ConnectionId,
+                DimSignalTargetNames.AppGroup(appId),
+                CancellationToken.None);
             await _routeService.DisconnectAsync(Context.ConnectionId, CancellationToken.None);
         }
         catch (InvalidOperationException)
@@ -91,6 +103,7 @@ public sealed class DimChatHub(
             try
             {
                 await _signalSender.SendToConnectionAsync(
+                    route.AppId,
                     route.ServerId,
                     route.ConnectionId,
                     DimInternalSignalTypes.ForceOffline,
@@ -109,15 +122,19 @@ public sealed class DimChatHub(
     }
 
     private bool TryGetAuthenticatedUser(
+        out long appId,
         out string userId,
         out DimClientPlatform platform)
     {
         userId = Context.User?.FindFirst(AuthConstants.UserIdClaim)?.Value ?? string.Empty;
         platform = default;
 
+        var appIdValue = Context.User?.FindFirst(AuthConstants.AppIdClaim)?.Value;
         var platformValue = Context.User?.FindFirst(AuthConstants.PlatformClaim)?.Value;
 
-        return !string.IsNullOrWhiteSpace(userId)
+        return long.TryParse(appIdValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out appId)
+            && appId > 0
+            && !string.IsNullOrWhiteSpace(userId)
             && Enum.TryParse(platformValue, ignoreCase: true, out platform)
             && Enum.IsDefined(platform);
     }

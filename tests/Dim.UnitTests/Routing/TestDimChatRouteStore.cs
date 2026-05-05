@@ -21,12 +21,6 @@ internal sealed class TestDimChatRouteStore(bool allowMultiDeviceLogin = true) :
         var key = GetRouteKey(route);
         var replacedRoutes = GetReplacedRoutes(key);
 
-        if (!allowMultiDeviceLogin)
-        {
-            _routes.Clear();
-            _serverRoutes.Clear();
-        }
-
         _routes[key] = route;
         _serverRoutes[key] = route.ServerId;
 
@@ -34,13 +28,15 @@ internal sealed class TestDimChatRouteStore(bool allowMultiDeviceLogin = true) :
     }
 
     public ValueTask<IReadOnlyCollection<DimUserConnectionRoute>> GetRoutesAsync(
+        long appId,
         IReadOnlyCollection<string> userIds,
         CancellationToken cancellationToken)
     {
         var normalizedUserIds = userIds.ToHashSet(StringComparer.Ordinal);
         var routes = _routes.Values
-            .Where(route => normalizedUserIds.Contains(route.UserId))
+            .Where(route => route.AppId == appId && normalizedUserIds.Contains(route.UserId))
             .Select(route => new DimUserConnectionRoute(
+                route.AppId,
                 route.UserId,
                 route.Platform,
                 route.ConnectionId,
@@ -100,9 +96,7 @@ internal sealed class TestDimChatRouteStore(bool allowMultiDeviceLogin = true) :
 
     private DimReplacedConnectionRoute[]? GetReplacedRoutes(string routeKey)
     {
-        var routes = allowMultiDeviceLogin
-            ? GetRouteReplacedRoutes(routeKey)
-            : [.. _routes.Values.Select(ToReplacedRoute)];
+        var routes = GetRouteReplacedRoutes(routeKey);
 
         return routes.Length == 0 ? null : routes;
     }
@@ -116,14 +110,14 @@ internal sealed class TestDimChatRouteStore(bool allowMultiDeviceLogin = true) :
 
     private static DimReplacedConnectionRoute ToReplacedRoute(DimConectionRoute route)
     {
-        return new DimReplacedConnectionRoute(route.Platform, route.ConnectionId, route.ServerId);
+        return new DimReplacedConnectionRoute(route.AppId, route.Platform, route.ConnectionId, route.ServerId);
     }
 
     private string GetRouteKey(DimConectionRoute route)
     {
         return allowMultiDeviceLogin
-            ? $"user:{route.UserId}:platform:{route.Platform.ToString().ToLowerInvariant()}"
-            : $"user:{route.UserId}";
+            ? $"app:{route.AppId}:user:{route.UserId}:platform:{route.Platform.ToString().ToLowerInvariant()}"
+            : $"app:{route.AppId}:user:{route.UserId}";
     }
 }
 

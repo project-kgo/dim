@@ -8,6 +8,7 @@ public interface IDimChatRouteStore
         CancellationToken cancellationToken);
 
     ValueTask<IReadOnlyCollection<DimUserConnectionRoute>> GetRoutesAsync(
+        long appId,
         IReadOnlyCollection<string> userIds,
         CancellationToken cancellationToken);
 

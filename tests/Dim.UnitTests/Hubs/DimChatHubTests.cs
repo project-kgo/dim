@@ -12,11 +12,14 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using System.Globalization;
 
 namespace Dim.UnitTests.Hubs;
 
 public sealed class DimChatHubTests
 {
+    private const long AppId = 1001;
+
     [Fact]
     public async Task OnConnectedAsyncWhenUserClaimsInvalidShouldAbortConnection()
     {
@@ -36,6 +39,7 @@ public sealed class DimChatHubTests
         var store = new TestDimChatRouteStore();
         var service = new DimChatRouteService(store, new TestLocalConnectionRouteStore(), new DimServerIdentity());
         var oldRoute = (await service.ConnectAsync(
+            AppId,
             "u1",
             DimClientPlatform.Web,
             "old",
@@ -45,7 +49,7 @@ public sealed class DimChatHubTests
         var signalSender = new RecordingSignalSender();
         var hub = CreateHub(
             store,
-            new TestHubCallerContext("new", CreateUser("u1", DimClientPlatform.Web)),
+            new TestHubCallerContext("new", CreateUser(AppId, "u1", DimClientPlatform.Web)),
             clients,
             signalSender);
 
@@ -54,6 +58,7 @@ public sealed class DimChatHubTests
         clients.Messages.Should().BeEmpty();
 
         var message = signalSender.ConnectionMessages.Should().ContainSingle().Subject;
+        message.AppId.Should().Be(AppId);
         message.ServerId.Should().Be(oldRoute.ServerId);
         message.ConnectionId.Should().Be("old");
         message.SignalType.Should().Be(DimInternalSignalTypes.ForceOffline);
@@ -66,12 +71,13 @@ public sealed class DimChatHubTests
         var store = new TestDimChatRouteStore();
         var service = new DimChatRouteService(store, new TestLocalConnectionRouteStore(), new DimServerIdentity());
         await service.ConnectAsync(
+            AppId,
             "u1",
             DimClientPlatform.Web,
             "old",
             new DimChatConnectionOptions(),
             CancellationToken.None);
-        var context = new TestHubCallerContext("new", CreateUser("u1", DimClientPlatform.Web));
+        var context = new TestHubCallerContext("new", CreateUser(AppId, "u1", DimClientPlatform.Web));
         var hub = CreateHub(
             store,
             context,
@@ -81,14 +87,30 @@ public sealed class DimChatHubTests
         await hub.OnConnectedAsync();
 
         context.Aborted.Should().BeFalse();
-        store.Routes["user:u1:platform:web"].ConnectionId.Should().Be("new");
+        store.Routes["app:1001:user:u1:platform:web"].ConnectionId.Should().Be("new");
+    }
+
+    [Fact]
+    public async Task OnConnectedAsyncShouldAddConnectionToAppGroup()
+    {
+        var groups = new RecordingGroupManager();
+        var hub = CreateHub(
+            new TestDimChatRouteStore(),
+            new TestHubCallerContext("c1", CreateUser(AppId, "u1", DimClientPlatform.Web)),
+            new RecordingHubClients(),
+            groupManager: groups);
+
+        await hub.OnConnectedAsync();
+
+        groups.AddedGroups.Should().ContainSingle().Which.Should().Be(("c1", "dim:app:1001"));
     }
 
     private static DimChatHub CreateHub(
         TestDimChatRouteStore store,
         HubCallerContext context,
         IHubCallerClients clients,
-        IDimSignalSender? signalSender = null)
+        IDimSignalSender? signalSender = null,
+        IGroupManager? groupManager = null)
     {
         return new DimChatHub(
             new DimChatRouteService(store, new TestLocalConnectionRouteStore(), new DimServerIdentity()),
@@ -97,16 +119,19 @@ public sealed class DimChatHubTests
             Options.Create(new DimChatOptions()))
         {
             Context = context,
-            Clients = clients
+            Clients = clients,
+            Groups = groupManager ?? new RecordingGroupManager()
         };
     }
 
     private static ClaimsPrincipal CreateUser(
+        long appId,
         string userId,
         DimClientPlatform platform)
     {
         var claims = new[]
         {
+            new Claim(AuthConstants.AppIdClaim, appId.ToString(CultureInfo.InvariantCulture)),
             new Claim(AuthConstants.UserIdClaim, userId),
             new Claim(AuthConstants.PlatformClaim, platform.ToString())
         };
@@ -228,11 +253,37 @@ public sealed class DimChatHubTests
         string Method,
         object?[] Arguments);
 
+    private sealed class RecordingGroupManager : IGroupManager
+    {
+        public List<(string ConnectionId, string GroupName)> AddedGroups { get; } = [];
+
+        public List<(string ConnectionId, string GroupName)> RemovedGroups { get; } = [];
+
+        public Task AddToGroupAsync(
+            string connectionId,
+            string groupName,
+            CancellationToken cancellationToken = default)
+        {
+            AddedGroups.Add((connectionId, groupName));
+            return Task.CompletedTask;
+        }
+
+        public Task RemoveFromGroupAsync(
+            string connectionId,
+            string groupName,
+            CancellationToken cancellationToken = default)
+        {
+            RemovedGroups.Add((connectionId, groupName));
+            return Task.CompletedTask;
+        }
+    }
+
     private sealed class RecordingSignalSender : IDimSignalSender
     {
         public List<RecordedSignalConnectionMessage> ConnectionMessages { get; } = [];
 
         public ValueTask SendToUsersAsync(
+            long appId,
             IReadOnlyCollection<string> userIds,
             string signalType,
             ReadOnlyMemory<byte> payload,
@@ -242,6 +293,7 @@ public sealed class DimChatHubTests
         }
 
         public ValueTask SendToConnectionAsync(
+            long appId,
             string serverId,
             string connectionId,
             string signalType,
@@ -249,6 +301,7 @@ public sealed class DimChatHubTests
             CancellationToken cancellationToken = default)
         {
             ConnectionMessages.Add(new RecordedSignalConnectionMessage(
+                appId,
                 serverId,
                 connectionId,
                 signalType,
@@ -257,6 +310,7 @@ public sealed class DimChatHubTests
         }
 
         public ValueTask BroadcastAsync(
+            long appId,
             string signalType,
             ReadOnlyMemory<byte> payload,
             CancellationToken cancellationToken = default)
@@ -266,6 +320,7 @@ public sealed class DimChatHubTests
     }
 
     private sealed record RecordedSignalConnectionMessage(
+        long AppId,
         string ServerId,
         string ConnectionId,
         string SignalType,
@@ -274,6 +329,7 @@ public sealed class DimChatHubTests
     private sealed class ThrowingSignalSender : IDimSignalSender
     {
         public ValueTask SendToUsersAsync(
+            long appId,
             IReadOnlyCollection<string> userIds,
             string signalType,
             ReadOnlyMemory<byte> payload,
@@ -283,6 +339,7 @@ public sealed class DimChatHubTests
         }
 
         public ValueTask SendToConnectionAsync(
+            long appId,
             string serverId,
             string connectionId,
             string signalType,
@@ -293,6 +350,7 @@ public sealed class DimChatHubTests
         }
 
         public ValueTask BroadcastAsync(
+            long appId,
             string signalType,
             ReadOnlyMemory<byte> payload,
             CancellationToken cancellationToken = default)

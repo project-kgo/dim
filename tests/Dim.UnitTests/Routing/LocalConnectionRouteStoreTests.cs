@@ -92,6 +92,7 @@ public sealed class LocalConnectionRouteStoreTests
         DimClientPlatform platform = DimClientPlatform.Web)
     {
         return new DimConectionRoute(
+            1001,
             userId,
             platform,
             connectionId,

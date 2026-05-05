@@ -31,8 +31,12 @@ public sealed class DimSignalHubDispatcher(
         switch (target.TargetCase)
         {
             case SignalTarget.TargetOneofCase.Users:
+                ThrowIfInvalidAppId(target.AppId);
+                var userIdentifiers = target.Users.UserIds
+                    .Select(userId => DimSignalTargetNames.UserIdentifier(target.AppId, userId))
+                    .ToArray();
                 await _hubContext.Clients
-                    .Users(target.Users.UserIds)
+                    .Users(userIdentifiers)
                     .SendAsync(_clientMethodName, message, cancellationToken);
                 break;
 
@@ -45,13 +49,22 @@ public sealed class DimSignalHubDispatcher(
                 break;
 
             case SignalTarget.TargetOneofCase.All:
+                ThrowIfInvalidAppId(target.AppId);
                 await _hubContext.Clients
-                    .All
+                    .Group(DimSignalTargetNames.AppGroup(target.AppId))
                     .SendAsync(_clientMethodName, message, cancellationToken);
                 break;
 
             default:
                 throw new InvalidOperationException("Dim 信令目标未设置。");
+        }
+    }
+
+    private static void ThrowIfInvalidAppId(long appId)
+    {
+        if (appId <= 0)
+        {
+            throw new InvalidOperationException("Dim 信令目标 AppId 未设置。");
         }
     }
 
